@@ -1,0 +1,43 @@
+const BASE_URL = 'http://localhost:5000/api';
+
+const request = async (endpoint, method, body = null) => {
+    const token = localStorage.getItem('token');
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    console.log(token);
+
+    const config = {
+        method,
+        headers,
+    };
+
+    if (body) {
+        config.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+        // Mimic axios error structure for compatibility
+        const error = new Error(data.message || 'Something went wrong');
+        error.response = { data };
+        throw error;
+    }
+
+    return { data };
+};
+
+const api = {
+    get: (endpoint) => request(endpoint, 'GET'),
+    post: (endpoint, body) => request(endpoint, 'POST', body),
+    put: (endpoint, body) => request(endpoint, 'PUT', body),
+    delete: (endpoint) => request(endpoint, 'DELETE'),
+};
+
+export default api;
