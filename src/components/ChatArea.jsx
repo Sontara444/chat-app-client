@@ -4,7 +4,7 @@ import { useChat } from '../context/ChatContext';
 import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X } from 'lucide-react';
 
 const ChatArea = () => {
-    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage } = useChat();
+    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel } = useChat();
     const [newMessage, setNewMessage] = useState('');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState('');
@@ -12,38 +12,108 @@ const ChatArea = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+    const menuRef = useRef(null);
     const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowMenu(false);
+            }
+        };
+
+        if (showMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showMenu]);
+
+    const handleLeaveChannel = async () => {
+        if (confirm(`Are you sure you want to leave #${currentChannel.name}?`)) {
+            try {
+                await leaveChannel(currentChannel._id);
+                setShowMenu(false);
+            } catch (error) {
+                console.error("Failed to leave channel", error);
+            }
+        }
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Scroll to bottom only on initial load or new message (not when loading more)
-    useEffect(() => {
-        if (messages.length <= 50) {
-            scrollToBottom();
-        }
-    }, [messages.length, currentChannel]);
+    // Track if user is near bottom
+    const [isNearBottom, setIsNearBottom] = useState(true);
+    const previousMessagesLength = useRef(messages.length);
 
-    // Handle scroll-based pagination
+    // Detect if user is scrolled near bottom
     useEffect(() => {
         const container = messagesContainerRef.current;
         if (!container) return;
 
         const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+            setIsNearBottom(distanceFromBottom < 100);
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Smooth scroll to bottom when new messages arrive (only if user is near bottom)
+    useEffect(() => {
+        const messagesAdded = messages.length > previousMessagesLength.current;
+
+        if (messagesAdded && isNearBottom) {
+            // Small delay to ensure DOM is updated
+            setTimeout(() => {
+                scrollToBottom();
+            }, 100);
+        }
+
+        previousMessagesLength.current = messages.length;
+    }, [messages, isNearBottom]);
+
+    // Instant scroll to bottom on channel change (no animation - like WhatsApp)
+    useEffect(() => {
+        if (currentChannel) {
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "auto" }); // instant scroll
+            }, 100);
+        }
+    }, [currentChannel?._id]);
+
+    // Handle scroll-based pagination with stable scroll position
+    useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        let isLoadingMore = false;
+
+        const handleScroll = () => {
             // Check if scrolled to top (with small threshold)
-            if (container.scrollTop < 100 && hasMore) {
+            if (container.scrollTop < 100 && hasMore && !isLoadingMore) {
+                isLoadingMore = true;
                 const previousScrollHeight = container.scrollHeight;
                 const previousScrollTop = container.scrollTop;
 
                 loadMoreMessages().then(() => {
-                    // Maintain scroll position after loading
+                    // Maintain scroll position after loading older messages
                     requestAnimationFrame(() => {
                         const newScrollHeight = container.scrollHeight;
-                        container.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+                        const scrollDiff = newScrollHeight - previousScrollHeight;
+                        container.scrollTop = previousScrollTop + scrollDiff;
+                        isLoadingMore = false;
                     });
+                }).catch(() => {
+                    isLoadingMore = false;
                 });
             }
         };
@@ -58,7 +128,7 @@ const ChatArea = () => {
             sendMessage(newMessage);
             setNewMessage('');
             sendTyping(false);
-            setTimeout(scrollToBottom, 100);
+            // Smooth scroll will happen automatically via useEffect
         }
     };
 
@@ -84,20 +154,27 @@ const ChatArea = () => {
         }
     };
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!searchQuery.trim()) return;
-
-        setIsSearching(true);
-        try {
-            const response = await api.get(`/messages/search?query=${searchQuery}&channelId=${currentChannel._id}`);
-            setSearchResults(response.data);
-        } catch (error) {
-            console.error("Search error", error);
-        } finally {
-            setIsSearching(false);
+    // Debounced live search
+    useEffect(() => {
+        if (!searchQuery.trim() || !currentChannel) {
+            setSearchResults([]);
+            return;
         }
-    };
+
+        const timeoutId = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const response = await api.get(`/messages/search?query=${searchQuery}&channelId=${currentChannel._id}`);
+                setSearchResults(response.data);
+            } catch (error) {
+                console.error("Search error", error);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300); // 300ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery, currentChannel]);
 
     if (!currentChannel) {
         return (
@@ -130,28 +207,52 @@ const ChatArea = () => {
                     <button onClick={() => setIsSearchOpen(!isSearchOpen)} className={`hover:text-white transition-colors ${isSearchOpen ? 'text-violet-500' : ''}`}><Search size={20} /></button>
                     <button className="hover:text-white transition-colors"><Phone size={20} /></button>
                     <button className="hover:text-white transition-colors"><Video size={20} /></button>
-                    <button className="hover:text-white transition-colors"><MoreVertical size={20} /></button>
+                    <div className="relative" ref={menuRef}>
+                        <button onClick={() => setShowMenu(!showMenu)} className="hover:text-white transition-colors">
+                            <MoreVertical size={20} />
+                        </button>
+                        {showMenu && (
+                            <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-2 z-50">
+                                <button
+                                    onClick={handleLeaveChannel}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 flex items-center"
+                                >
+                                    <X size={14} className="mr-2" />
+                                    Leave Channel
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Search Bar */}
             {isSearchOpen && (
                 <div className="px-6 py-3 bg-slate-900 border-b border-slate-800 flex items-center">
-                    <form onSubmit={handleSearch} className="flex-1 flex items-center relative">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search messages..."
-                            className="w-full bg-slate-800 text-slate-200 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:ring-1 focus:ring-violet-500 border border-slate-700"
-                        />
-                        <Search size={16} className="absolute left-3 text-slate-500" />
-                        {searchResults.length > 0 && (
-                            <button type="button" onClick={() => setSearchResults([])} className="absolute right-3 text-slate-500 hover:text-white">
-                                <X size={16} />
-                            </button>
+                    <div className="flex-1 flex flex-col relative">
+                        <div className="flex items-center">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search messages..."
+                                className="w-full bg-slate-800 text-slate-200 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:ring-1 focus:ring-violet-500 border border-slate-700"
+                            />
+                            <Search size={16} className="absolute left-3 text-slate-500" />
+                            {searchQuery && (
+                                <button type="button" onClick={() => { setSearchQuery(''); setSearchResults([]); }} className="absolute right-3 text-slate-500 hover:text-white">
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                        {isSearching && <p className="text-xs text-slate-400 mt-1">Searching...</p>}
+                        {!isSearching && searchQuery && searchResults.length > 0 && (
+                            <p className="text-xs text-slate-400 mt-1">{searchResults.length} result(s) found</p>
                         )}
-                    </form>
+                        {!isSearching && searchQuery && searchResults.length === 0 && (
+                            <p className="text-xs text-slate-400 mt-1">No results found</p>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -187,7 +288,8 @@ const ChatArea = () => {
                     const isEditing = editingMessageId === msg._id;
 
                     return (
-                        <div key={msg._id || index} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSameUser ? 'mt-1' : 'mt-4'} group/message`}>
+                        <div key={`${msg._id}-${msg.timestamp}-${index}`}
+                            className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSameUser ? 'mt-1' : 'mt-4'} group/message`}>
                             {!isMe && !isSameUser && (
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white mr-3 shadow-lg shrink-0">
                                     {msg.sender.username?.substring(0, 2).toUpperCase()}
@@ -261,21 +363,23 @@ const ChatArea = () => {
             {/* Input */}
             <div className="p-4 bg-slate-900 border-t border-slate-800">
                 <form onSubmit={handleSend} className="relative max-w-4xl mx-auto">
-                    <input
-                        type="text"
+                    <textarea
                         value={newMessage}
                         onChange={handleTyping}
                         placeholder={`Message #${currentChannel.name}`}
-                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-5 pr-12 py-3.5 outline-none focus:ring-2 focus:ring-violet-500/50 border border-slate-700 focus:border-violet-500 transition-all shadow-inner placeholder-slate-500"
+                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-5 pr-12 py-3.5 outline-none resize-none h-14"
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSend(e);
+                            }
+                        }}
                     />
-                    <button
-                        type="submit"
-                        disabled={!newMessage.trim()}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 disabled:opacity-50 disabled:hover:bg-violet-600 transition-all shadow-lg shadow-violet-500/20"
-                    >
+                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 ...">
                         <Send size={18} />
                     </button>
                 </form>
+
             </div>
         </div>
     );

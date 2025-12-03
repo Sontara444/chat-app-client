@@ -1,28 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../context/ChatContext';
-import { Hash, Plus, LogOut, MessageSquare, UserPlus, UserMinus, Lock, Users, Settings, X } from 'lucide-react';
+import {
+    Hash, Plus, LogOut, MessageSquare,
+    UserPlus, Lock, Users, Settings, X
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 
 const Sidebar = () => {
-    const { channels, currentChannel, setCurrentChannel, createChannel, joinChannel, leaveChannel, updateChannel, deleteChannel } = useChat();
+
+    const {
+        channels,
+        currentChannel,
+        setCurrentChannel,
+        createChannel,
+        joinChannel,
+        leaveChannel,
+        updateChannel,
+        deleteChannel
+    } = useChat();
+
     const [isCreating, setIsCreating] = useState(false);
     const [newChannelName, setNewChannelName] = useState('');
     const [isPrivate, setIsPrivate] = useState(false);
     const [selectedMembers, setSelectedMembers] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
     const [hoveredChannelId, setHoveredChannelId] = useState(null);
-    const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, channelId: null });
+
+    const [contextMenu, setContextMenu] = useState({
+        isOpen: false, x: 0, y: 0, channelId: null
+    });
+
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [channelToEdit, setChannelToEdit] = useState(null);
     const [channelToDelete, setChannelToDelete] = useState(null);
+
     const [editName, setEditName] = useState('');
     const [editDescription, setEditDescription] = useState('');
+
     const contextMenuRef = useRef(null);
     const navigate = useNavigate();
     const currentUser = JSON.parse(localStorage.getItem('user'));
 
+    // Fetch users for private channels
     useEffect(() => {
         if (isCreating && isPrivate) {
             const fetchUsers = async () => {
@@ -49,24 +70,28 @@ const Sidebar = () => {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [contextMenu.isOpen]);
 
     const handleCreateChannel = async (e) => {
         e.preventDefault();
-        if (newChannelName.trim()) {
-            try {
-                const newChannel = await createChannel(newChannelName, '', isPrivate ? 'private' : 'public', selectedMembers);
-                setCurrentChannel(newChannel);
-                setNewChannelName('');
-                setIsPrivate(false);
-                setSelectedMembers([]);
-                setIsCreating(false);
-            } catch (error) {
-                alert('Failed to create channel');
-            }
+        if (!newChannelName.trim()) return;
+        try {
+            const newChannel = await createChannel(
+                newChannelName,
+                '',
+                isPrivate ? 'private' : 'public',
+                selectedMembers
+            );
+
+            setCurrentChannel(newChannel);
+            setIsCreating(false);
+            setNewChannelName('');
+            setIsPrivate(false);
+            setSelectedMembers([]);
+
+        } catch (error) {
+            alert('Failed to create channel');
         }
     };
 
@@ -82,27 +107,12 @@ const Sidebar = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/login');
-    }
+    };
 
     const handleJoin = async (e, channelId) => {
         e.stopPropagation();
-        try {
-            await joinChannel(channelId);
-        } catch (error) {
-            console.error("Failed to join channel", error);
-        }
-    }
-
-    const handleLeave = async (e, channelId) => {
-        e.stopPropagation();
-        if (confirm('Are you sure you want to leave this channel?')) {
-            try {
-                await leaveChannel(channelId);
-            } catch (error) {
-                console.error("Failed to leave channel", error);
-            }
-        }
-    }
+        await joinChannel(channelId);
+    };
 
     const handleGearClick = (e, channel) => {
         e.stopPropagation();
@@ -136,22 +146,20 @@ const Sidebar = () => {
             setIsEditModalOpen(false);
             setChannelToEdit(null);
         } catch (error) {
-            alert('Failed to update channel');
+            alert('Failed to update channel. Please try again.');
+            console.error('Error updating channel:', error);
         }
     };
 
     const handleConfirmDelete = async () => {
-        try {
-            await deleteChannel(channelToDelete);
-            setIsDeleteModalOpen(false);
-            setChannelToDelete(null);
-        } catch (error) {
-            alert('Failed to delete channel');
-        }
+        await deleteChannel(channelToDelete);
+        setIsDeleteModalOpen(false);
+        setChannelToDelete(null);
     };
 
     return (
         <div className="w-64 bg-slate-900 text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-xl z-10">
+
             {/* Header */}
             <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
                 <div className="bg-violet-600 p-2 rounded-lg shadow-lg shadow-violet-500/20">
@@ -162,8 +170,11 @@ const Sidebar = () => {
 
             {/* Channels List */}
             <div className="flex-1 overflow-y-auto py-4">
+
                 <div className="px-4 mb-2 flex justify-between items-center text-slate-400">
                     <span className="text-xs font-bold uppercase tracking-wider">Channels</span>
+
+                    {/* Create button */}
                     <button
                         onClick={() => setIsCreating(!isCreating)}
                         className="hover:text-violet-400 transition-colors p-1 rounded hover:bg-slate-800"
@@ -172,67 +183,81 @@ const Sidebar = () => {
                     </button>
                 </div>
 
+                {/* Create Modal */}
                 {isCreating && (
                     <div className="px-4 mb-4 bg-slate-800/50 p-3 rounded-lg border border-slate-700 mx-2">
+
                         <form onSubmit={handleCreateChannel} className="space-y-3">
+
                             <input
                                 type="text"
                                 value={newChannelName}
                                 onChange={(e) => setNewChannelName(e.target.value)}
                                 placeholder="Channel name"
-                                className="w-full bg-slate-900 text-slate-200 text-sm rounded-md px-3 py-2 outline-none border border-slate-700 focus:border-violet-500 transition-all placeholder-slate-500"
-                                autoFocus
+                                className="w-full bg-slate-900 text-slate-200 text-sm rounded-md px-3 py-2 outline-none 
+                                border border-slate-700 focus:border-violet-500 transition-all"
                             />
 
-                            <div className="flex items-center space-x-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsPrivate(!isPrivate)}
-                                    className={`flex items-center text-xs px-2 py-1 rounded transition-colors ${isPrivate ? 'bg-violet-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                >
-                                    {isPrivate ? <Lock size={12} className="mr-1" /> : <Hash size={12} className="mr-1" />}
-                                    {isPrivate ? 'Private' : 'Public'}
-                                </button>
-                            </div>
+                            {/* Private / Public */}
+                            <button
+                                type="button"
+                                onClick={() => setIsPrivate(!isPrivate)}
+                                className={`flex items-center text-xs px-2 py-1 rounded transition-colors 
+                                ${isPrivate ? 'bg-violet-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                            >
+                                {isPrivate ? <Lock size={12} className="mr-1" /> : <Hash size={12} className="mr-1" />}
+                                {isPrivate ? 'Private' : 'Public'}
+                            </button>
 
+                            {/* Member list */}
                             {isPrivate && (
-                                <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-700 rounded p-1 bg-slate-900">
-                                    <p className="text-[10px] text-slate-500 px-1 mb-1">Select members:</p>
+                                <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-700 
+                                rounded p-1 bg-slate-900">
                                     {allUsers.map(user => (
                                         <div
                                             key={user._id}
                                             onClick={() => toggleMember(user._id)}
-                                            className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs ${selectedMembers.includes(user._id) ? 'bg-violet-900/50 text-violet-200' : 'hover:bg-slate-800 text-slate-300'}`}
+                                            className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs 
+                                            ${selectedMembers.includes(user._id)
+                                                    ? 'bg-violet-900/50 text-violet-200'
+                                                    : 'hover:bg-slate-800 text-slate-300'
+                                                }`}
                                         >
-                                            <div className={`w-3 h-3 rounded-full mr-2 border ${selectedMembers.includes(user._id) ? 'bg-violet-500 border-violet-500' : 'border-slate-500'}`}></div>
+                                            <div className={`w-3 h-3 rounded-full mr-2 border 
+                                                ${selectedMembers.includes(user._id)
+                                                    ? 'bg-violet-500 border-violet-500'
+                                                    : 'border-slate-500'
+                                                }`}
+                                            ></div>
                                             {user.username}
                                         </div>
                                     ))}
                                 </div>
                             )}
 
+                            {/* Buttons */}
                             <div className="flex justify-end space-x-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreating(false)}
-                                    className="text-xs text-slate-400 hover:text-white"
-                                >
+                                <button type="button" onClick={() => setIsCreating(false)} className="text-xs text-slate-400 hover:text-white">
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="text-xs bg-violet-600 text-white px-3 py-1 rounded hover:bg-violet-500"
-                                >
+                                <button type="submit" className="text-xs bg-violet-600 text-white px-3 py-1 rounded">
                                     Create
                                 </button>
                             </div>
+
                         </form>
                     </div>
                 )}
 
+                {/* Channel list */}
                 <div className="space-y-1 px-2">
-                    {channels.map((channel) => {
-                        const isMember = channel.members.some(m => m._id === currentUser?.id || m === currentUser?.id);
+
+                    {channels.map(channel => {
+
+                        const isMember = channel.members.some(
+                            m => m._id === currentUser?.id || m === currentUser?.id
+                        );
+
                         const isPrivateChannel = channel.type === 'private';
 
                         return (
@@ -242,51 +267,64 @@ const Sidebar = () => {
                                 onMouseEnter={() => setHoveredChannelId(channel._id)}
                                 onMouseLeave={() => setHoveredChannelId(null)}
                             >
-                                <button
+                                {/* Channel item */}
+                                <div
                                     onClick={() => setCurrentChannel(channel)}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${currentChannel?._id === channel._id
-                                        ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
-                                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md 
+                                    text-sm font-medium transition-all duration-200 
+                                    ${currentChannel?._id === channel._id
+                                            ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                                         }`}
                                 >
                                     <div className="flex items-center truncate">
                                         {isPrivateChannel ? (
-                                            <Lock size={14} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                            <Lock size={14} className="mr-3 text-slate-500 group-hover:text-slate-400" />
                                         ) : (
-                                            <Hash size={18} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                            <Hash size={18} className="mr-3 text-slate-500 group-hover:text-slate-400" />
                                         )}
-                                        <span className="truncate">{channel.name}</span>
+                                        <span>{channel.name}</span>
                                     </div>
+
                                     <div className="flex items-center space-x-1">
+
                                         {isMember && (
                                             <>
                                                 {isPrivateChannel && <Users size={12} className="opacity-50 mr-1" />}
-                                                <span className="text-[10px] opacity-60">{channel.members.length}</span>
+                                                <span className="text-[10px] opacity-60">
+                                                    {channel.members.length}
+                                                </span>
                                             </>
                                         )}
+
+                                        {/* FIXED: replaced button with span */}
                                         {isMember && hoveredChannelId === channel._id && (
-                                            <button
+                                            <span
                                                 onClick={(e) => handleGearClick(e, channel)}
-                                                className="p-1 hover:bg-slate-700 rounded transition-all opacity-0 group-hover:opacity-100"
+                                                className="p-1 hover:bg-slate-700 rounded transition-all opacity-0 
+                                                group-hover:opacity-100 cursor-pointer"
                                                 title="Channel Settings"
                                             >
                                                 <Settings size={14} />
-                                            </button>
+                                            </span>
                                         )}
+
+                                        {/* Join */}
                                         {!isMember && (
-                                            <div
+                                            <span
                                                 onClick={(e) => handleJoin(e, channel._id)}
-                                                className="p-1 hover:text-green-400 transition-colors cursor-pointer"
-                                                title="Join Channel"
+                                                className="p-1 hover:text-green-400 cursor-pointer"
                                             >
                                                 <UserPlus size={14} />
-                                            </div>
+                                            </span>
                                         )}
                                     </div>
-                                </button>
+                                </div>
+
                             </div>
                         );
                     })}
+
                 </div>
             </div>
 
@@ -299,18 +337,26 @@ const Sidebar = () => {
                 >
                     <button
                         onClick={handleEditChannel}
-                        className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center"
+                        className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center"
                     >
                         <Settings size={14} className="mr-2" />
                         Edit Channel
                     </button>
-                    <button
-                        onClick={handleDeleteChannel}
-                        className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 transition-colors flex items-center"
-                    >
-                        <X size={14} className="mr-2" />
-                        Delete Channel
-                    </button>
+
+                    {/* Only show delete option if user is the creator */}
+                    {(() => {
+                        const channel = channels.find(c => c._id === contextMenu.channelId);
+                        const isCreator = channel?.createdBy?._id === currentUser?.id || channel?.createdBy === currentUser?.id;
+                        return isCreator && (
+                            <button
+                                onClick={handleDeleteChannel}
+                                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 flex items-center"
+                            >
+                                <X size={14} className="mr-2" />
+                                Delete Channel
+                            </button>
+                        );
+                    })()}
                 </div>
             )}
 
@@ -385,12 +431,13 @@ const Sidebar = () => {
             <div className="p-4 border-t border-slate-800 bg-slate-900/50">
                 <button
                     onClick={handleLogout}
-                    className="w-full flex items-center justify-center px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-all text-sm font-medium"
+                    className="w-full flex items-center justify-center px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md text-sm"
                 >
                     <LogOut size={16} className="mr-2" />
                     Sign Out
                 </button>
             </div>
+
         </div>
     );
 };
