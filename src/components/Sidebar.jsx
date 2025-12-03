@@ -7,7 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
 
     const {
         channels,
@@ -90,6 +90,11 @@ const Sidebar = () => {
             setIsPrivate(false);
             setSelectedMembers([]);
 
+            // Close sidebar on mobile after selection
+            if (window.innerWidth < 1024) {
+                onClose && onClose();
+            }
+
         } catch (error) {
             alert('Failed to create channel');
         }
@@ -157,8 +162,20 @@ const Sidebar = () => {
         setChannelToDelete(null);
     };
 
+    const handleChannelSelect = (channel) => {
+        setCurrentChannel(channel);
+        // Close sidebar on mobile when channel is selected
+        if (window.innerWidth < 1024) {
+            onClose && onClose();
+        }
+    };
+
     return (
-        <div className="w-64 bg-slate-900 text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-xl z-10">
+        <div className={`
+            fixed inset-y-0 left-0 z-30 w-4/5 max-w-xs bg-slate-900 text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-xl transition-transform duration-300 ease-in-out
+            lg:relative lg:translate-x-0 lg:w-64
+            ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
 
             {/* Header */}
             <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
@@ -269,7 +286,7 @@ const Sidebar = () => {
                             >
                                 {/* Channel item */}
                                 <div
-                                    onClick={() => setCurrentChannel(channel)}
+                                    onClick={() => handleChannelSelect(channel)}
                                     className={`w-full flex items-center justify-between px-3 py-2 rounded-md 
                                     text-sm font-medium transition-all duration-200 
                                     ${currentChannel?._id === channel._id

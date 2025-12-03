@@ -3,7 +3,7 @@ import api from '../api/api';
 import { useChat } from '../context/ChatContext';
 import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X } from 'lucide-react';
 
-const ChatArea = () => {
+const ChatArea = ({ onOpenSidebar }) => {
     const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel } = useChat();
     const [newMessage, setNewMessage] = useState('');
     const [editingMessageId, setEditingMessageId] = useState(null);
@@ -178,8 +178,20 @@ const ChatArea = () => {
 
     if (!currentChannel) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 text-slate-400 p-8">
-                <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-800 text-center max-w-md w-full">
+            <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 text-slate-400 p-8 relative">
+                {/* Mobile Menu Button for Empty State */}
+                <button
+                    onClick={onOpenSidebar}
+                    className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white lg:hidden"
+                >
+                    <div className="space-y-1.5">
+                        <span className="block w-6 h-0.5 bg-current"></span>
+                        <span className="block w-6 h-0.5 bg-current"></span>
+                        <span className="block w-6 h-0.5 bg-current"></span>
+                    </div>
+                </button>
+
+                <div className="bg-slate-900 p-8 rounded-2xl shadow-2xl border border-slate-800 text-center max-w-md w-full mx-4">
                     <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Hash size={32} className="text-violet-500" />
                     </div>
@@ -191,22 +203,34 @@ const ChatArea = () => {
     }
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-slate-950 relative">
+        <div className="flex-1 flex flex-col h-full bg-slate-950 relative w-full">
             {/* Header */}
-            <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
+            <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex items-center">
-                    <Hash size={24} className="text-violet-500 mr-3" />
-                    <div>
-                        <h2 className="font-bold text-white text-lg leading-tight">{currentChannel.name}</h2>
+                    {/* Hamburger Menu - Visible on Mobile/Tablet */}
+                    <button
+                        onClick={onOpenSidebar}
+                        className="mr-3 text-slate-400 hover:text-white lg:hidden focus:outline-none"
+                    >
+                        <div className="space-y-1.5">
+                            <span className="block w-5 h-0.5 bg-current"></span>
+                            <span className="block w-5 h-0.5 bg-current"></span>
+                            <span className="block w-5 h-0.5 bg-current"></span>
+                        </div>
+                    </button>
+
+                    <Hash size={24} className="text-violet-500 mr-2 md:mr-3 shrink-0" />
+                    <div className="min-w-0">
+                        <h2 className="font-bold text-white text-base md:text-lg leading-tight truncate">{currentChannel.name}</h2>
                         {currentChannel.description && (
-                            <p className="text-xs text-slate-400">{currentChannel.description}</p>
+                            <p className="text-xs text-slate-400 truncate hidden sm:block">{currentChannel.description}</p>
                         )}
                     </div>
                 </div>
-                <div className="flex items-center space-x-4 text-slate-400">
+                <div className="flex items-center space-x-2 md:space-x-4 text-slate-400">
                     <button onClick={() => setIsSearchOpen(!isSearchOpen)} className={`hover:text-white transition-colors ${isSearchOpen ? 'text-violet-500' : ''}`}><Search size={20} /></button>
-                    <button className="hover:text-white transition-colors"><Phone size={20} /></button>
-                    <button className="hover:text-white transition-colors"><Video size={20} /></button>
+                    <button className="hover:text-white transition-colors hidden sm:block"><Phone size={20} /></button>
+                    <button className="hover:text-white transition-colors hidden sm:block"><Video size={20} /></button>
                     <div className="relative" ref={menuRef}>
                         <button onClick={() => setShowMenu(!showMenu)} className="hover:text-white transition-colors">
                             <MoreVertical size={20} />
@@ -297,7 +321,7 @@ const ChatArea = () => {
                             )}
                             {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
 
-                            <div className={`max-w-[70%] relative`}>
+                            <div className={`max-w-[90%] md:max-w-[70%] relative`}>
                                 {isEditing ? (
                                     <div className="flex flex-col space-y-2">
                                         <textarea
