@@ -1,27 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../context/ChatContext';
-import { Hash, Plus, LogOut, MessageSquare, UserPlus, UserMinus } from 'lucide-react';
+import { Hash, Plus, LogOut, MessageSquare, UserPlus, UserMinus, Lock, Users, Settings, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/api';
 
 const Sidebar = () => {
-    const { channels, currentChannel, setCurrentChannel, createChannel, joinChannel, leaveChannel } = useChat();
+    const { channels, currentChannel, setCurrentChannel, createChannel, joinChannel, leaveChannel, updateChannel, deleteChannel } = useChat();
     const [isCreating, setIsCreating] = useState(false);
     const [newChannelName, setNewChannelName] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
+    const [selectedMembers, setSelectedMembers] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
+    const [hoveredChannelId, setHoveredChannelId] = useState(null);
+    const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, channelId: null });
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [channelToEdit, setChannelToEdit] = useState(null);
+    const [channelToDelete, setChannelToDelete] = useState(null);
+    const [editName, setEditName] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const contextMenuRef = useRef(null);
     const navigate = useNavigate();
     const currentUser = JSON.parse(localStorage.getItem('user'));
+
+    useEffect(() => {
+        if (isCreating && isPrivate) {
+            const fetchUsers = async () => {
+                try {
+                    const response = await api.get('/auth/users');
+                    setAllUsers(response.data.filter(u => u._id !== currentUser.id));
+                } catch (error) {
+                    console.error("Failed to fetch users", error);
+                }
+            };
+            fetchUsers();
+        }
+    }, [isCreating, isPrivate]);
+
+    // Close context menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+                setContextMenu({ isOpen: false, x: 0, y: 0, channelId: null });
+            }
+        };
+
+        if (contextMenu.isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [contextMenu.isOpen]);
 
     const handleCreateChannel = async (e) => {
         e.preventDefault();
         if (newChannelName.trim()) {
             try {
-                const newChannel = await createChannel(newChannelName);
+                const newChannel = await createChannel(newChannelName, '', isPrivate ? 'private' : 'public', selectedMembers);
                 setCurrentChannel(newChannel);
                 setNewChannelName('');
+                setIsPrivate(false);
+                setSelectedMembers([]);
                 setIsCreating(false);
             } catch (error) {
                 alert('Failed to create channel');
             }
         }
+    };
+
+    const toggleMember = (userId) => {
+        setSelectedMembers(prev =>
+            prev.includes(userId)
+                ? prev.filter(id => id !== userId)
+                : [...prev, userId]
+        );
     };
 
     const handleLogout = () => {
@@ -50,6 +104,52 @@ const Sidebar = () => {
         }
     }
 
+    const handleGearClick = (e, channel) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setContextMenu({
+            isOpen: true,
+            x: rect.left,
+            y: rect.bottom + 5,
+            channelId: channel._id
+        });
+    };
+
+    const handleEditChannel = () => {
+        const channel = channels.find(c => c._id === contextMenu.channelId);
+        setChannelToEdit(channel);
+        setEditName(channel.name);
+        setEditDescription(channel.description || '');
+        setIsEditModalOpen(true);
+        setContextMenu({ isOpen: false, x: 0, y: 0, channelId: null });
+    };
+
+    const handleDeleteChannel = () => {
+        setChannelToDelete(contextMenu.channelId);
+        setIsDeleteModalOpen(true);
+        setContextMenu({ isOpen: false, x: 0, y: 0, channelId: null });
+    };
+
+    const handleSaveEdit = async () => {
+        try {
+            await updateChannel(channelToEdit._id, editName, editDescription);
+            setIsEditModalOpen(false);
+            setChannelToEdit(null);
+        } catch (error) {
+            alert('Failed to update channel');
+        }
+    };
+
+    const handleConfirmDelete = async () => {
+        try {
+            await deleteChannel(channelToDelete);
+            setIsDeleteModalOpen(false);
+            setChannelToDelete(null);
+        } catch (error) {
+            alert('Failed to delete channel');
+        }
+    };
+
     return (
         <div className="w-64 bg-slate-900 text-slate-100 flex flex-col h-full border-r border-slate-800 shadow-xl z-10">
             {/* Header */}
@@ -73,60 +173,213 @@ const Sidebar = () => {
                 </div>
 
                 {isCreating && (
-                    <form onSubmit={handleCreateChannel} className="px-4 mb-4">
-                        <input
-                            type="text"
-                            value={newChannelName}
-                            onChange={(e) => setNewChannelName(e.target.value)}
-                            placeholder="channel-name"
-                            className="w-full bg-slate-800 text-slate-200 text-sm rounded-md px-3 py-2 outline-none border border-slate-700 focus:border-violet-500 transition-all placeholder-slate-500"
-                            autoFocus
-                        />
-                    </form>
+                    <div className="px-4 mb-4 bg-slate-800/50 p-3 rounded-lg border border-slate-700 mx-2">
+                        <form onSubmit={handleCreateChannel} className="space-y-3">
+                            <input
+                                type="text"
+                                value={newChannelName}
+                                onChange={(e) => setNewChannelName(e.target.value)}
+                                placeholder="Channel name"
+                                className="w-full bg-slate-900 text-slate-200 text-sm rounded-md px-3 py-2 outline-none border border-slate-700 focus:border-violet-500 transition-all placeholder-slate-500"
+                                autoFocus
+                            />
+
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPrivate(!isPrivate)}
+                                    className={`flex items-center text-xs px-2 py-1 rounded transition-colors ${isPrivate ? 'bg-violet-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                                >
+                                    {isPrivate ? <Lock size={12} className="mr-1" /> : <Hash size={12} className="mr-1" />}
+                                    {isPrivate ? 'Private' : 'Public'}
+                                </button>
+                            </div>
+
+                            {isPrivate && (
+                                <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-700 rounded p-1 bg-slate-900">
+                                    <p className="text-[10px] text-slate-500 px-1 mb-1">Select members:</p>
+                                    {allUsers.map(user => (
+                                        <div
+                                            key={user._id}
+                                            onClick={() => toggleMember(user._id)}
+                                            className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs ${selectedMembers.includes(user._id) ? 'bg-violet-900/50 text-violet-200' : 'hover:bg-slate-800 text-slate-300'}`}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full mr-2 border ${selectedMembers.includes(user._id) ? 'bg-violet-500 border-violet-500' : 'border-slate-500'}`}></div>
+                                            {user.username}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end space-x-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreating(false)}
+                                    className="text-xs text-slate-400 hover:text-white"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="text-xs bg-violet-600 text-white px-3 py-1 rounded hover:bg-violet-500"
+                                >
+                                    Create
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 )}
 
                 <div className="space-y-1 px-2">
                     {channels.map((channel) => {
                         const isMember = channel.members.some(m => m._id === currentUser?.id || m === currentUser?.id);
+                        const isPrivateChannel = channel.type === 'private';
+
                         return (
-                            <div key={channel._id} className="group relative">
+                            <div
+                                key={channel._id}
+                                className="group relative"
+                                onMouseEnter={() => setHoveredChannelId(channel._id)}
+                                onMouseLeave={() => setHoveredChannelId(null)}
+                            >
                                 <button
                                     onClick={() => setCurrentChannel(channel)}
                                     className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${currentChannel?._id === channel._id
-                                            ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                                        ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
+                                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                                         }`}
                                 >
                                     <div className="flex items-center truncate">
-                                        <Hash size={18} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                        {isPrivateChannel ? (
+                                            <Lock size={14} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                        ) : (
+                                            <Hash size={18} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                        )}
                                         <span className="truncate">{channel.name}</span>
                                     </div>
-                                    {isMember ? (
-                                        <div className="flex items-center space-x-1">
-                                            <span className="text-[10px] opacity-60">{channel.members.length}</span>
-                                            <div
-                                                onClick={(e) => handleLeave(e, channel._id)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity cursor-pointer"
-                                                title="Leave Channel"
+                                    <div className="flex items-center space-x-1">
+                                        {isMember && (
+                                            <>
+                                                {isPrivateChannel && <Users size={12} className="opacity-50 mr-1" />}
+                                                <span className="text-[10px] opacity-60">{channel.members.length}</span>
+                                            </>
+                                        )}
+                                        {isMember && hoveredChannelId === channel._id && (
+                                            <button
+                                                onClick={(e) => handleGearClick(e, channel)}
+                                                className="p-1 hover:bg-slate-700 rounded transition-all opacity-0 group-hover:opacity-100"
+                                                title="Channel Settings"
                                             >
-                                                <UserMinus size={14} />
+                                                <Settings size={14} />
+                                            </button>
+                                        )}
+                                        {!isMember && (
+                                            <div
+                                                onClick={(e) => handleJoin(e, channel._id)}
+                                                className="p-1 hover:text-green-400 transition-colors cursor-pointer"
+                                                title="Join Channel"
+                                            >
+                                                <UserPlus size={14} />
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            onClick={(e) => handleJoin(e, channel._id)}
-                                            className="p-1 hover:text-green-400 transition-colors cursor-pointer"
-                                            title="Join Channel"
-                                        >
-                                            <UserPlus size={14} />
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </button>
                             </div>
                         );
                     })}
                 </div>
             </div>
+
+            {/* Context Menu */}
+            {contextMenu.isOpen && (
+                <div
+                    ref={contextMenuRef}
+                    className="fixed bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-2 z-50 min-w-[180px]"
+                    style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+                >
+                    <button
+                        onClick={handleEditChannel}
+                        className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors flex items-center"
+                    >
+                        <Settings size={14} className="mr-2" />
+                        Edit Channel
+                    </button>
+                    <button
+                        onClick={handleDeleteChannel}
+                        className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 transition-colors flex items-center"
+                    >
+                        <X size={14} className="mr-2" />
+                        Delete Channel
+                    </button>
+                </div>
+            )}
+
+            {/* Edit Channel Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md border border-slate-700">
+                        <h2 className="text-xl font-bold text-white mb-4">Edit Channel</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-sm text-slate-400 mb-1 block">Channel Name</label>
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="w-full bg-slate-900 text-slate-200 rounded-lg px-3 py-2 outline-none border border-slate-700 focus:border-violet-500 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm text-slate-400 mb-1 block">Description</label>
+                                <textarea
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    className="w-full bg-slate-900 text-slate-200 rounded-lg px-3 py-2 outline-none border border-slate-700 focus:border-violet-500 transition-all resize-none"
+                                    rows="3"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-3 mt-6">
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveEdit}
+                                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 transition-colors"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Channel Modal */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md border border-red-900/30">
+                        <h2 className="text-xl font-bold text-red-400 mb-2">Delete this channel permanently?</h2>
+                        <p className="text-sm text-slate-400 mb-6">This action cannot be undone.</p>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Footer */}
             <div className="p-4 border-t border-slate-800 bg-slate-900/50">

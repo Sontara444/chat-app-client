@@ -16,6 +16,8 @@ export const ChatProvider = ({ children }) => {
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(1);
 
+    const [typingUsers, setTypingUsers] = useState({});
+
     // Initialize Socket
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -52,7 +54,35 @@ export const ChatProvider = ({ children }) => {
 
         socket.on('receive_message', (message) => {
             if (currentChannel && message.channel === currentChannel._id) {
+                setMessages((prev) => [message, ...prev]); // Newest first for chat view if reversed? Wait, existing code appends.
+                // The existing code appends: setMessages((prev) => [...prev, message]);
+                // But getMessages returns newest first, then reverses. So messages are [oldest, ..., newest].
+                // So appending is correct.
                 setMessages((prev) => [...prev, message]);
+            }
+        });
+
+        socket.on('message_updated', (updatedMessage) => {
+            setMessages((prev) => prev.map(msg => msg._id === updatedMessage._id ? updatedMessage : msg));
+        });
+
+        socket.on('message_deleted', (messageId) => {
+            setMessages((prev) => prev.filter(msg => msg._id !== messageId));
+        });
+
+        socket.on('typing', ({ userId, username, channelId }) => {
+            if (currentChannel && channelId === currentChannel._id) {
+                setTypingUsers(prev => ({ ...prev, [userId]: username }));
+            }
+        });
+
+        socket.on('stop_typing', ({ userId, channelId }) => {
+            if (currentChannel && channelId === currentChannel._id) {
+                setTypingUsers(prev => {
+                    const newState = { ...prev };
+                    delete newState[userId];
+                    return newState;
+                });
             }
         });
 
@@ -62,6 +92,10 @@ export const ChatProvider = ({ children }) => {
 
         return () => {
             socket.off('receive_message');
+            socket.off('message_updated');
+            socket.off('message_deleted');
+            socket.off('typing');
+            socket.off('stop_typing');
             socket.off('online_users');
         };
     }, [socket, currentChannel]);
@@ -100,9 +134,31 @@ export const ChatProvider = ({ children }) => {
         }
     };
 
-    const createChannel = async (name, description) => {
+    const sendTyping = (isTyping) => {
+        if (socket && currentChannel) {
+            socket.emit(isTyping ? 'typing' : 'stop_typing', currentChannel._id);
+        }
+    };
+
+    const editMessage = async (messageId, content) => {
         try {
-            const response = await api.post('/channels', { name, description });
+            await api.put(`/messages/${messageId}`, { content });
+        } catch (error) {
+            console.error("Error editing message", error);
+        }
+    };
+
+    const deleteMessage = async (messageId) => {
+        try {
+            await api.delete(`/messages/${messageId}`);
+        } catch (error) {
+            console.error("Error deleting message", error);
+        }
+    };
+
+    const createChannel = async (name, description, type = 'public', members = []) => {
+        try {
+            const response = await api.post('/channels', { name, description, type, members });
             setChannels([...channels, response.data]);
             return response.data;
         } catch (error) {
@@ -156,6 +212,33 @@ export const ChatProvider = ({ children }) => {
         }
     };
 
+    const updateChannel = async (channelId, name, description) => {
+        try {
+            const response = await api.put(`/channels/${channelId}`, { name, description });
+            setChannels(prev => prev.map(c => c._id === channelId ? response.data : c));
+            if (currentChannel && currentChannel._id === channelId) {
+                setCurrentChannel(response.data);
+            }
+            return response.data;
+        } catch (error) {
+            console.error("Error updating channel", error);
+            throw error;
+        }
+    };
+
+    const deleteChannel = async (channelId) => {
+        try {
+            await api.delete(`/channels/${channelId}`);
+            setChannels(prev => prev.filter(c => c._id !== channelId));
+            if (currentChannel && currentChannel._id === channelId) {
+                setCurrentChannel(null);
+            }
+        } catch (error) {
+            console.error("Error deleting channel", error);
+            throw error;
+        }
+    };
+
     const value = {
         socket,
         channels,
@@ -168,6 +251,12 @@ export const ChatProvider = ({ children }) => {
         leaveChannel,
         loadMoreMessages,
         hasMore,
+        typingUsers,
+        sendTyping,
+        editMessage,
+        deleteMessage,
+        updateChannel,
+        deleteChannel,
         onlineUsers,
         loading
     };
