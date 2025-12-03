@@ -18,7 +18,7 @@ export const ChatProvider = ({ children }) => {
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (token) {
-            const newSocket = io('http://localhost:5000', {
+            const newSocket = io(import.meta.env.VITE_SOCKET_URL, {
                 auth: { token }
             });
 
