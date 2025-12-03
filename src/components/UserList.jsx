@@ -23,6 +23,16 @@ const UserList = () => {
         return onlineUsers.some(user => user._id === userId);
     };
 
+    // Sort users: online first, then offline
+    const sortedUsers = [...allUsers].sort((a, b) => {
+        const aOnline = isUserOnline(a._id);
+        const bOnline = isUserOnline(b._id);
+
+        if (aOnline && !bOnline) return -1;
+        if (!aOnline && bOnline) return 1;
+        return 0;
+    });
+
     return (
         <div className="w-64 bg-slate-900 border-l border-slate-800 hidden lg:flex flex-col shadow-xl z-10">
             <div className="p-6 border-b border-slate-800 font-bold text-slate-100 flex items-center justify-between">
@@ -38,7 +48,7 @@ const UserList = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {allUsers.map((user) => {
+                {sortedUsers.map((user) => {
                     const online = isUserOnline(user._id);
                     return (
                         <div key={user._id} className="flex items-center px-3 py-2 text-slate-300 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors group">
