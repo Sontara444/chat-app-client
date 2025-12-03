@@ -178,7 +178,7 @@ const ChatArea = () => {
 
             {/* Messages */}
             <div
-                className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar"
                 ref={messagesContainerRef}
             >
                 {messages.map((msg, index) => {
@@ -196,13 +196,6 @@ const ChatArea = () => {
                             {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
 
                             <div className={`max-w-[70%] relative`}>
-                                {!isSameUser && !isMe && (
-                                    <div className="flex items-baseline mb-1 ml-1">
-                                        <span className="text-xs font-bold text-slate-300 mr-2">{msg.sender.username}</span>
-                                        <span className="text-[10px] text-slate-500">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                )}
-
                                 {isEditing ? (
                                     <div className="flex flex-col space-y-2">
                                         <textarea
@@ -217,25 +210,31 @@ const ChatArea = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-md leading-relaxed relative group-hover/message:shadow-lg transition-all ${isMe
-                                        ? 'bg-violet-600 text-white rounded-br-none'
-                                        : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
-                                        }`}>
-                                        {msg.content}
-                                        {/* Message Actions */}
-                                        {isMe && (
-                                            <div className="absolute -top-8 right-0 bg-slate-900 border border-slate-800 rounded-lg shadow-xl p-1 flex space-x-1 opacity-0 group-hover/message:opacity-100 transition-opacity z-10">
-                                                <button onClick={() => handleEdit(msg)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-violet-400"><Edit2 size={12} /></button>
-                                                <button onClick={() => deleteMessage(msg._id)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400"><Trash2 size={12} /></button>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {isMe && !isSameUser && (
-                                    <div className="text-[10px] text-slate-500 text-right mt-1 mr-1">
-                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
+                                    <>
+                                        <div className={`px-4 py-3 rounded-2xl text-[15px] shadow-lg leading-relaxed relative group-hover/message:shadow-xl transition-all ${isMe
+                                            ? 'bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-md'
+                                            : 'bg-slate-800/90 text-slate-100 rounded-bl-md border border-slate-700/50'
+                                            }`}>
+                                            {msg.content}
+                                            {/* Message Actions */}
+                                            {isMe && (
+                                                <div className="absolute -top-9 right-0 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-lg shadow-2xl p-1.5 flex space-x-1 opacity-0 group-hover/message:opacity-100 transition-all z-10">
+                                                    <button onClick={() => handleEdit(msg)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-violet-400 transition-colors">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button onClick={() => deleteMessage(msg._id)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Sender Name and Time Below Every Bubble */}
+                                        <div className={`flex items-center mt-1.5 text-[11px] ${isMe ? 'justify-end text-slate-400' : 'justify-start text-slate-500'} px-1`}>
+                                            <span className="font-semibold">{msg.sender.username}</span>
+                                            <span className="mx-1.5 text-slate-600">•</span>
+                                            <span className="font-normal">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>
