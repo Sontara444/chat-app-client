@@ -25,7 +25,32 @@ const ChatArea = () => {
         if (messages.length <= 50) {
             scrollToBottom();
         }
-    }, [messages.length, currentChannel]); // Depend on length to detect new messages, but this is a simple heuristic
+    }, [messages.length, currentChannel]);
+
+    // Handle scroll-based pagination
+    useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            // Check if scrolled to top (with small threshold)
+            if (container.scrollTop < 100 && hasMore) {
+                const previousScrollHeight = container.scrollHeight;
+                const previousScrollTop = container.scrollTop;
+
+                loadMoreMessages().then(() => {
+                    // Maintain scroll position after loading
+                    requestAnimationFrame(() => {
+                        const newScrollHeight = container.scrollHeight;
+                        container.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+                    });
+                });
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [hasMore, loadMoreMessages]);
 
     const handleSend = (e) => {
         e.preventDefault();
@@ -156,18 +181,6 @@ const ChatArea = () => {
                 className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
                 ref={messagesContainerRef}
             >
-                {hasMore && (
-                    <div className="flex justify-center">
-                        <button
-                            onClick={loadMoreMessages}
-                            className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 px-3 py-1 rounded-full transition-colors flex items-center"
-                        >
-                            <ArrowUp size={12} className="mr-1" />
-                            Load older messages
-                        </button>
-                    </div>
-                )}
-
                 {messages.map((msg, index) => {
                     const isMe = msg.sender._id === user?.id;
                     const isSameUser = index > 0 && messages[index - 1].sender._id === msg.sender._id;
