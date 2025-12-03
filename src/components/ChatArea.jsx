@@ -178,7 +178,7 @@ const ChatArea = () => {
 
             {/* Messages */}
             <div
-                className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar"
+                className="flex-1 overflow-y-auto p-6 space-y-6 no-"
                 ref={messagesContainerRef}
             >
                 {messages.map((msg, index) => {
