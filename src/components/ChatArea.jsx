@@ -1,26 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../context/ChatContext';
-import { Send, Hash, MoreVertical, Phone, Video } from 'lucide-react';
+import { Send, Hash, MoreVertical, Phone, Video, ArrowUp } from 'lucide-react';
 
 const ChatArea = () => {
-    const { currentChannel, messages, sendMessage } = useChat();
+    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore } = useChat();
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
     const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Scroll to bottom only on initial load or new message (not when loading more)
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        if (messages.length <= 50) {
+            scrollToBottom();
+        }
+    }, [messages.length, currentChannel]); // Depend on length to detect new messages, but this is a simple heuristic
 
     const handleSend = (e) => {
         e.preventDefault();
         if (newMessage.trim()) {
             sendMessage(newMessage);
             setNewMessage('');
+            setTimeout(scrollToBottom, 100); // Ensure scroll happens after state update
         }
     };
 
@@ -59,7 +64,22 @@ const ChatArea = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+            <div
+                className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                ref={messagesContainerRef}
+            >
+                {hasMore && (
+                    <div className="flex justify-center">
+                        <button
+                            onClick={loadMoreMessages}
+                            className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 px-3 py-1 rounded-full transition-colors flex items-center"
+                        >
+                            <ArrowUp size={12} className="mr-1" />
+                            Load older messages
+                        </button>
+                    </div>
+                )}
+
                 {messages.map((msg, index) => {
                     const isMe = msg.sender._id === user?.id;
                     const isSameUser = index > 0 && messages[index - 1].sender._id === msg.sender._id;

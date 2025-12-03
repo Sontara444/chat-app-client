@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { useChat } from '../context/ChatContext';
-import { Hash, Plus, LogOut, MessageSquare } from 'lucide-react';
+import { Hash, Plus, LogOut, MessageSquare, UserPlus, UserMinus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Sidebar = () => {
-    const { channels, currentChannel, setCurrentChannel, createChannel } = useChat();
+    const { channels, currentChannel, setCurrentChannel, createChannel, joinChannel, leaveChannel } = useChat();
     const [isCreating, setIsCreating] = useState(false);
     const [newChannelName, setNewChannelName] = useState('');
     const navigate = useNavigate();
+    const currentUser = JSON.parse(localStorage.getItem('user'));
 
     const handleCreateChannel = async (e) => {
         e.preventDefault();
         if (newChannelName.trim()) {
             try {
                 const newChannel = await createChannel(newChannelName);
-                console.log(newChannel);
                 setCurrentChannel(newChannel);
                 setNewChannelName('');
                 setIsCreating(false);
@@ -26,7 +26,28 @@ const Sidebar = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
+    }
+
+    const handleJoin = async (e, channelId) => {
+        e.stopPropagation();
+        try {
+            await joinChannel(channelId);
+        } catch (error) {
+            console.error("Failed to join channel", error);
+        }
+    }
+
+    const handleLeave = async (e, channelId) => {
+        e.stopPropagation();
+        if (confirm('Are you sure you want to leave this channel?')) {
+            try {
+                await leaveChannel(channelId);
+            } catch (error) {
+                console.error("Failed to leave channel", error);
+            }
+        }
     }
 
     return (
@@ -65,19 +86,45 @@ const Sidebar = () => {
                 )}
 
                 <div className="space-y-1 px-2">
-                    {channels.map((channel) => (
-                        <button
-                            key={channel._id}
-                            onClick={() => setCurrentChannel(channel)}
-                            className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 group ${currentChannel?._id === channel._id
-                                ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-                                }`}
-                        >
-                            <Hash size={18} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
-                            <span className="truncate">{channel.name}</span>
-                        </button>
-                    ))}
+                    {channels.map((channel) => {
+                        const isMember = channel.members.some(m => m._id === currentUser?.id || m === currentUser?.id);
+                        return (
+                            <div key={channel._id} className="group relative">
+                                <button
+                                    onClick={() => setCurrentChannel(channel)}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${currentChannel?._id === channel._id
+                                            ? 'bg-violet-600 text-white shadow-md shadow-violet-500/10'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                                        }`}
+                                >
+                                    <div className="flex items-center truncate">
+                                        <Hash size={18} className={`mr-3 ${currentChannel?._id === channel._id ? 'text-violet-200' : 'text-slate-500 group-hover:text-slate-400'}`} />
+                                        <span className="truncate">{channel.name}</span>
+                                    </div>
+                                    {isMember ? (
+                                        <div className="flex items-center space-x-1">
+                                            <span className="text-[10px] opacity-60">{channel.members.length}</span>
+                                            <div
+                                                onClick={(e) => handleLeave(e, channel._id)}
+                                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity cursor-pointer"
+                                                title="Leave Channel"
+                                            >
+                                                <UserMinus size={14} />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            onClick={(e) => handleJoin(e, channel._id)}
+                                            className="p-1 hover:text-green-400 transition-colors cursor-pointer"
+                                            title="Join Channel"
+                                        >
+                                            <UserPlus size={14} />
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
