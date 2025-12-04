@@ -271,7 +271,7 @@ export const ChatProvider = ({ children }) => {
         });
 
         socket.on('user_left_call', ({ userId, name }) => {
-            sendMessage(`${name || 'User'} left the call`);
+            sendMessage(`⚠️ ${name || 'User'} left the call`);
             leaveCall(false);
         });
 
@@ -290,7 +290,7 @@ export const ChatProvider = ({ children }) => {
         const startTime = new Date();
         setCallStartTime(startTime);
         const timeStr = startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        sendMessage(`${call.callType === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
+        sendMessage(`📞 ${call.callType === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
 
         try {
             const constraints = { video: call.callType === 'video', audio: true };
@@ -329,7 +329,7 @@ export const ChatProvider = ({ children }) => {
             peer.on('close', () => {
                 console.log('Connection closed');
                 if (!cleanupDone) {
-                    sendMessage(`${call.name || 'User'} left the call`);
+                    sendMessage(`⚠️ ${call.name} left the call`);
                     leaveCall(false);
                 }
             });
@@ -394,7 +394,7 @@ export const ChatProvider = ({ children }) => {
                 const startTime = new Date();
                 setCallStartTime(startTime);
                 const timeStr = startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                sendMessage(`${type === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
+                sendMessage(`📞 ${type === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
                 socket.emit('call_started', { to: id });
             });
 
@@ -461,9 +461,9 @@ export const ChatProvider = ({ children }) => {
             const seconds = Math.floor((durationMs % 60000) / 1000);
             const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             const typeText = callType === 'video' ? 'Video' : 'Voice';
-            sendMessage(`${typeText} call ended - duration ${durationStr}`);
+            sendMessage(`🛑 ${typeText} call ended — duration ${durationStr}`);
         } else if (call.isReceivingCall && !callAccepted) {
-            sendMessage(`Missed ${call.callType === 'video' ? 'video' : 'voice'} call from ${call.name}`);
+            sendMessage(`⚠️ Missed ${call.callType === 'video' ? 'video' : 'voice'} call from ${call.name}`);
         }
 
         // Reset state
@@ -484,9 +484,10 @@ export const ChatProvider = ({ children }) => {
             }
         }
 
-        // Reset cleanup flag - NO PAGE RELOAD
+        // Reset cleanup flag after a delay
         setTimeout(() => {
             setCleanupDone(false);
+            window.location.reload();
         }, 1000);
     };
 

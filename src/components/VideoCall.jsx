@@ -84,22 +84,8 @@ const VideoCall = () => {
             {/* Hidden audio element for remote audio stream */}
             <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
 
-            {/* CSS Animation for floating preview */}
-            <style>{`
-                @keyframes fadeInScale {
-                    0% {
-                        opacity: 0;
-                        transform: scale(0.8);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-            `}</style>
-
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 backdrop-blur-xl p-4">
-                <div className="relative w-full max-w-4xl">
+                <div className="relative w-full max-w-md">
 
                     {/* Glass-morphism container */}
                     <div className="relative backdrop-blur-2xl bg-white/5 rounded-3xl border border-white/10 shadow-2xl overflow-hidden p-8">
@@ -119,29 +105,24 @@ const VideoCall = () => {
                         <div className="relative mb-8">
 
                             {callType === 'video' && callAccepted && !callEnded ? (
-                                /* Video Call UI - New Layout */
-                                <div className="relative">
-                                    {/* Remote Video - Main Large Area */}
-                                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/40 border border-white/10 shadow-2xl">
+                                /* Video Call UI */
+                                <div className="space-y-4">
+                                    {/* Remote Video (Large) */}
+                                    <div className="relative aspect-video rounded-2xl overflow-hidden bg-black/40 border border-white/10">
                                         <video
                                             playsInline
                                             ref={userVideo}
                                             autoPlay
-                                            className="w-full h-full object-contain bg-black"
+                                            className="w-full h-full object-cover"
                                         />
-                                        <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/70 rounded-full text-white text-xs backdrop-blur-md shadow-lg">
+                                        <div className="absolute bottom-3 left-3 px-3 py-1 bg-black/50 rounded-full text-white text-xs backdrop-blur-sm">
                                             {call.name || 'User'}
                                         </div>
                                     </div>
 
-                                    {/* Local Video - Small Floating Preview */}
-                                    {stream && (
-                                        <div
-                                            className="absolute top-4 right-4 w-32 sm:w-36 md:w-40 aspect-[3/4] rounded-xl overflow-hidden bg-black/60 border-2 border-white/30 shadow-2xl z-10 animate-fadeInScale"
-                                            style={{
-                                                animation: 'fadeInScale 0.3s ease-out forwards'
-                                            }}
-                                        >
+                                    {/* Local Video (Small Picture-in-Picture) */}
+                                    <div className="absolute top-4 right-4 w-24 h-32 rounded-xl overflow-hidden bg-black/40 border-2 border-white/20">
+                                        {stream && (
                                             <video
                                                 playsInline
                                                 muted
@@ -149,11 +130,11 @@ const VideoCall = () => {
                                                 autoPlay
                                                 className="w-full h-full object-cover"
                                             />
-                                            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/70 rounded-full text-white text-[10px] backdrop-blur-sm font-medium">
-                                                You
-                                            </div>
+                                        )}
+                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/50 rounded-full text-white text-[10px] backdrop-blur-sm">
+                                            You
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             ) : (
                                 /* Voice Call UI - Avatars */
