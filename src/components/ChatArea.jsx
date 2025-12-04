@@ -57,38 +57,28 @@ const ChatArea = ({ onOpenSidebar }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Robust scroll handling
-    const isInitialLoadRef = useRef(true);
-    const previousCount = useRef(0);
-
-    // Reset initial load state when channel changes
+    // Simple: scroll to bottom when channel changes
     useEffect(() => {
-        isInitialLoadRef.current = true;
+        if (currentChannel && messages.length > 0) {
+            setTimeout(() => scrollToBottom(), 100);
+        }
     }, [currentChannel?._id]);
 
-    // Handle scrolling for both initial load and new messages
+    // Simple: auto-scroll when new messages arrive (if at bottom)
+    const previousCount = useRef(0);
     useEffect(() => {
-        const container = messagesContainerRef.current;
-        if (!container) return;
-
-        // Case 1: Initial load for this channel (or first messages arrived)
-        if (isInitialLoadRef.current && messages.length > 0) {
-            setTimeout(() => scrollToBottom(), 100);
-            isInitialLoadRef.current = false;
-        }
-        // Case 2: New messages arrived (not initial load)
-        else if (messages.length > previousCount.current) {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-
-            // Auto-scroll if user was already at the bottom
-            if (isAtBottom) {
-                setTimeout(() => scrollToBottom(), 50);
+        if (messages.length > previousCount.current) {
+            const container = messagesContainerRef.current;
+            if (container) {
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+                if (isAtBottom) {
+                    setTimeout(() => scrollToBottom(), 50);
+                }
             }
         }
-
         previousCount.current = messages.length;
-    }, [messages]);
+    }, [messages.length]);
 
     // Simple: load more messages on scroll to top
     useEffect(() => {
