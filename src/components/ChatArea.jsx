@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/api';
 import { useChat } from '../context/ChatContext';
-import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X, Smile } from 'lucide-react';
 import MessageStatusIndicator from './MessageStatusIndicator';
+import data from '@emoji-mart/data';
+import Picker from '@emoji-mart/react';
 
 import VideoCall from './VideoCall';
 
@@ -18,26 +20,28 @@ const ChatArea = ({ onOpenSidebar }) => {
     const [showMenu, setShowMenu] = useState(false);
     const [showCallModal, setShowCallModal] = useState(false);
     const [callType, setCallType] = useState('video');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const menuRef = useRef(null);
+    const emojiPickerRef = useRef(null);
+    const inputRef = useRef(null);
     const isAtBottomRef = useRef(true);
-    const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
+    const user = JSON.parse(localStorage.getItem('user'));
 
-    // Close menu when clicking outside
+    // Close menu and emoji picker when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                setShowEmojiPicker(false);
+            }
         };
-
-        if (showMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
+        document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showMenu]);
+    }, []);
 
     const handleLeaveChannel = async () => {
         if (confirm(`Are you sure you want to leave #${currentChannel.name}?`)) {
@@ -505,11 +509,41 @@ const ChatArea = ({ onOpenSidebar }) => {
             {/* Input */}
             <div className="p-4 bg-slate-900 border-t border-slate-800">
                 <form onSubmit={handleSend} className="relative max-w-4xl mx-auto">
+                    {/* Emoji Picker */}
+                    {showEmojiPicker && (
+                        <div
+                            ref={emojiPickerRef}
+                            className="absolute bottom-20 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden"
+                        >
+                            <Picker
+                                data={data}
+                                onEmojiSelect={(emoji) => {
+                                    setNewMessage(prev => prev + emoji.native);
+                                    setShowEmojiPicker(false);
+                                    inputRef.current?.focus();
+                                }}
+                                theme="dark"
+                                previewPosition="none"
+                                skinTonePosition="search"
+                            />
+                        </div>
+                    )}
+
+                    {/* Emoji Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-400 transition-colors z-10"
+                    >
+                        <Smile size={20} />
+                    </button>
+
                     <textarea
+                        ref={inputRef}
                         value={newMessage}
                         onChange={handleTyping}
                         placeholder={`Message #${currentChannel.name}`}
-                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-5 pr-12 py-3.5 outline-none resize-none h-14"
+                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-12 pr-12 py-3.5 outline-none resize-none h-14 focus:ring-2 focus:ring-violet-500/50"
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
@@ -517,7 +551,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                             }
                         }}
                     />
-                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 ...">
+                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700 text-white p-2.5 rounded-full transition-colors">
                         <Send size={18} />
                     </button>
                 </form>
