@@ -15,7 +15,7 @@
     "@tailwindcss/postcss": "^4.1.17",
     "autoprefixer": "^10.4.22",
     "buffer": "^6.0.3",
-    "emoji-picker-react": "^4.16.1",
+    "emoji-mart": "^5.6.0",
     "lucide-react": "^0.555.0",
     "postcss": "^8.5.6",
     "react": "^19.2.0",
