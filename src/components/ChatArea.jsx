@@ -53,68 +53,60 @@ const ChatArea = ({ onOpenSidebar }) => {
         }
     };
 
-    const scrollToBottom = (behavior = "smooth") => {
-        messagesEndRef.current?.scrollIntoView({ behavior });
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Track if user is at bottom
-    const handleScroll = () => {
-        const container = messagesContainerRef.current;
-        if (!container) return;
-
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
-
-        // Pagination: Load more when near top
-        if (scrollTop < 50 && hasMore && !loading) {
-            const oldHeight = container.scrollHeight;
-            const oldScroll = container.scrollTop;
-
-            loadMoreMessages().then(() => {
-                // Scroll restoration handled in useLayoutEffect
-                // We store the old height to calculate offset
-                container.dataset.oldHeight = oldHeight;
-            });
-        }
-    };
-
-    // Initial scroll to bottom on channel change
+    // Simple: scroll to bottom when channel changes
     useEffect(() => {
         if (currentChannel && messages.length > 0) {
-            scrollToBottom("auto"); // Instant scroll on load
+            setTimeout(() => scrollToBottom(), 100);
         }
     }, [currentChannel?._id]);
 
-    // Handle scroll restoration and auto-scroll
-    React.useLayoutEffect(() => {
+    // Simple: auto-scroll when new messages arrive (if at bottom)
+    const previousCount = useRef(0);
+    useEffect(() => {
+        if (messages.length > previousCount.current) {
+            const container = messagesContainerRef.current;
+            if (container) {
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+                if (isAtBottom) {
+                    setTimeout(() => scrollToBottom(), 50);
+                }
+            }
+        }
+        previousCount.current = messages.length;
+    }, [messages.length]);
+
+    // Simple: load more messages on scroll to top
+    useEffect(() => {
         const container = messagesContainerRef.current;
         if (!container) return;
 
-        // 1. Pagination Restoration
-        if (container.dataset.oldHeight) {
-            const oldHeight = parseInt(container.dataset.oldHeight);
-            const newHeight = container.scrollHeight;
-            const heightDifference = newHeight - oldHeight;
+        let loading = false;
 
-            // Restore scroll position instantly
-            container.scrollTop = heightDifference;
-            delete container.dataset.oldHeight;
-            return;
-        }
+        const handleScroll = () => {
+            if (container.scrollTop < 50 && hasMore && !loading) {
+                loading = true;
+                const oldHeight = container.scrollHeight;
+                const oldScroll = container.scrollTop;
 
-        // 2. Auto-scroll for new messages
-        if (isAtBottomRef.current) {
-            scrollToBottom();
-        }
-    }, [messages]);
+                loadMoreMessages().then(() => {
+                    setTimeout(() => {
+                        container.scrollTop = oldScroll + (container.scrollHeight - oldHeight);
+                        loading = false;
+                    }, 10);
+                }).catch(() => {
+                    loading = false;
+                });
+            }
+        };
 
-    useEffect(() => {
-        const container = messagesContainerRef.current;
-        if (container) {
-            container.addEventListener('scroll', handleScroll);
-            return () => container.removeEventListener('scroll', handleScroll);
-        }
-    }, [hasMore, loading]);
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [hasMore, loadMoreMessages]);
 
     const handleSend = (e) => {
         e.preventDefault();
@@ -538,9 +530,9 @@ const ChatArea = ({ onOpenSidebar }) => {
                     <button
                         type="button"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-slate-400 hover:text-violet-400 hover:bg-slate-700/50 transition-all z-10"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-400 transition-colors z-10"
                     >
-                        <Smile size={22} />
+                        <Smile size={20} />
                     </button>
 
                     <textarea
@@ -548,7 +540,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                         value={newMessage}
                         onChange={handleTyping}
                         placeholder={`Message #${currentChannel.name}`}
-                        className="w-full bg-slate-800 text-slate-100 rounded-2xl pl-12 pr-14 py-4 outline-none resize-none h-14 focus:ring-2 focus:ring-violet-500/50 transition-all placeholder:text-slate-500"
+                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-12 pr-12 py-3.5 outline-none resize-none h-14 focus:ring-2 focus:ring-violet-500/50"
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
@@ -556,11 +548,8 @@ const ChatArea = ({ onOpenSidebar }) => {
                             }
                         }}
                     />
-                    <button
-                        type="submit"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700 text-white p-2.5 rounded-full transition-all shadow-lg hover:shadow-violet-500/25 active:scale-95 flex items-center justify-center"
-                    >
-                        <Send size={20} className="ml-0.5" />
+                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700 text-white p-2.5 rounded-full transition-colors">
+                        <Send size={18} />
                     </button>
                 </form>
 
