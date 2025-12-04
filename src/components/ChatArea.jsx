@@ -21,9 +21,7 @@ const ChatArea = ({ onOpenSidebar }) => {
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const menuRef = useRef(null);
-    const messageRefs = useRef({});
-    const observerRef = useRef(null);
-    const initialScrollDone = useRef(false);
+    const isAtBottomRef = useRef(true);
     const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
 
     // Close menu when clicking outside
@@ -52,81 +50,53 @@ const ChatArea = ({ onOpenSidebar }) => {
         }
     };
 
-    const scrollToBottom = (smooth = true) => {
-        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // Track if user is near bottom
-    const [isNearBottom, setIsNearBottom] = useState(true);
-
-    // Detect if user is scrolled near bottom
+    // Simple: scroll to bottom when channel changes
     useEffect(() => {
-        const container = messagesContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-            setIsNearBottom(distanceFromBottom < 100);
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // SINGLE scroll to bottom on initial channel load
-    useEffect(() => {
-        if (currentChannel && messages.length > 0 && !initialScrollDone.current) {
-            // Wait for messages to render, then scroll ONCE
-            setTimeout(() => {
-                scrollToBottom(true); // Smooth scroll on initial load
-                initialScrollDone.current = true;
-            }, 150);
+        if (currentChannel && messages.length > 0) {
+            setTimeout(() => scrollToBottom(), 100);
         }
-    }, [currentChannel?._id, messages.length]);
-
-    // Reset scroll flag when changing channels
-    useEffect(() => {
-        initialScrollDone.current = false;
     }, [currentChannel?._id]);
 
-    // Auto-scroll ONLY when new messages arrive AND user is at bottom
+    // Simple: auto-scroll when new messages arrive (if at bottom)
+    const previousCount = useRef(0);
     useEffect(() => {
-        if (!initialScrollDone.current) return; // Don't auto-scroll during initial load
-
-        const container = messagesContainerRef.current;
-        if (!container) return;
-
-        // Only auto-scroll if user is near bottom
-        if (isNearBottom && messages.length > 0) {
-            scrollToBottom(true);
+        if (messages.length > previousCount.current) {
+            const container = messagesContainerRef.current;
+            if (container) {
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+                if (isAtBottom) {
+                    setTimeout(() => scrollToBottom(), 50);
+                }
+            }
         }
-    }, [messages.length, isNearBottom]); // Only trigger on message count change
+        previousCount.current = messages.length;
+    }, [messages.length]);
 
-    // Infinite scroll upward - load older messages
+    // Simple: load more messages on scroll to top
     useEffect(() => {
         const container = messagesContainerRef.current;
         if (!container) return;
 
-        let isLoadingMore = false;
+        let loading = false;
 
         const handleScroll = () => {
-            // Only load more if scrolled near top and not already loading
-            if (container.scrollTop < 50 && hasMore && !isLoadingMore) {
-                isLoadingMore = true;
-                const previousScrollHeight = container.scrollHeight;
-                const previousScrollTop = container.scrollTop;
+            if (container.scrollTop < 50 && hasMore && !loading) {
+                loading = true;
+                const oldHeight = container.scrollHeight;
+                const oldScroll = container.scrollTop;
 
                 loadMoreMessages().then(() => {
-                    // Preserve scroll position (WhatsApp-style)
-                    requestAnimationFrame(() => {
-                        const newScrollHeight = container.scrollHeight;
-                        const scrollDiff = newScrollHeight - previousScrollHeight;
-                        container.scrollTop = previousScrollTop + scrollDiff;
-                        isLoadingMore = false;
-                    });
+                    setTimeout(() => {
+                        container.scrollTop = oldScroll + (container.scrollHeight - oldHeight);
+                        loading = false;
+                    }, 10);
                 }).catch(() => {
-                    isLoadingMore = false;
+                    loading = false;
                 });
             }
         };
@@ -247,46 +217,22 @@ const ChatArea = ({ onOpenSidebar }) => {
         return groups;
     }, [messages]);
 
-    // Intersection Observer for auto-read receipts
+    // Simple: mark messages as read when viewing channel
     useEffect(() => {
-        if (!currentChannel || !user) return;
+        if (!currentChannel || !messages.length || !user) return;
 
-        // Create observer
-        observerRef.current = new IntersectionObserver(
-            (entries) => {
-                const visibleMessageIds = [];
+        const unreadMessages = messages
+            .filter(msg => msg.sender._id !== user.id)
+            .map(msg => msg._id);
 
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        const messageId = entry.target.dataset.messageId;
-                        const senderId = entry.target.dataset.senderId;
+        if (unreadMessages.length > 0) {
+            const timer = setTimeout(() => {
+                markMessagesAsRead(unreadMessages);
+            }, 1000); // Mark as read after 1 second
 
-                        // Only mark as read if it's not our own message
-                        if (messageId && senderId !== user.id) {
-                            visibleMessageIds.push(messageId);
-                        }
-                    }
-                });
-
-                // Send read receipts for visible messages
-                if (visibleMessageIds.length > 0) {
-                    markMessagesAsRead(visibleMessageIds);
-                }
-            },
-            { threshold: 0.5, root: messagesContainerRef.current }
-        );
-
-        // Observe all message elements
-        Object.values(messageRefs.current).forEach((ref) => {
-            if (ref) observerRef.current.observe(ref);
-        });
-
-        return () => {
-            if (observerRef.current) {
-                observerRef.current.disconnect();
-            }
-        };
-    }, [messages, currentChannel, user, markMessagesAsRead]);
+            return () => clearTimeout(timer);
+        }
+    }, [currentChannel?._id, messages.length]);
 
     if (!currentChannel) {
         return (
@@ -479,9 +425,6 @@ const ChatArea = ({ onOpenSidebar }) => {
                             return (
                                 <div
                                     key={msg._id}
-                                    ref={(el) => messageRefs.current[msg._id] = el}
-                                    data-message-id={msg._id}
-                                    data-sender-id={msg.sender._id}
                                     className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSameUser ? 'mt-1' : 'mt-4'} group/message`}
                                 >
                                     {!isMe && !isSameUser && (
