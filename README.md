@@ -1,16 +1,75 @@
-# React + Vite
+# Chat App — Client (React + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the **frontend** of the real-time chat application built using **React, Vite, Socket.io-client, TailwindCSS**, and **WebRTC** for audio/video calling.
 
-Currently, two official plugins are available:
+The client supports real-time messaging, pagination, message search, typing indicators, and optional advanced features.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🚀 Features (Client)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### **Core Features**
+- Real-time messaging  
+- Show recent messages when opening a chat  
+- Smooth scrollbar + upward pagination  
+- Seen/Delivered indicators  
+- Responsive UI  
+- Sidebar channel list  
+- Clean WhatsApp-like interface  
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## ⭐ Optional Features (Implemented)
+> These are **additional advanced features** implemented beyond basic requirements.
+
+- **Private channels UI**  
+- **Typing indicators**  
+- **Message editing**  
+- **Message deletion**  
+- **Message search**  
+- **Voice call (WebRTC)**  
+- **Video call (WebRTC)**  
+
+---
+
+## 🛠️ Tech Stack
+- React.js  
+- Vite  
+- TailwindCSS  
+- Socket.io-client  
+- WebRTC API  
+- Lucide icons  
+
+---
+
+## 📦 Setup & Installation
+
+### Navigate to client folder
+cd client
+
+### Install dependencies
+npm install
+
+### Start the client
+npm run dev
+
+client/
+│── public/
+│── src/
+│   │── components/
+│   │── context/
+│   │── api/
+│   │── pages/
+│   │── styles/
+│   └── App.jsx
+│
+└── README.md
+
+## 📌 Assumptions & Limitations
+
+- Pagination loads messages only when scrolling upward  
+- WebRTC voice/video calls are limited to 1-to-1 communication  
+- Smooth scrolling depends on browser support and message load timing  
+- Emoji picker is optional and not included by default  
+- Image/file sharing is not enabled unless implemented separately  
+
