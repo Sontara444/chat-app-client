@@ -317,11 +317,6 @@ export const ChatProvider = ({ children }) => {
             }
         });
 
-        socket.on('call_accepted', (signal) => {
-            setCallAccepted(true);
-            peer.signal(signal);
-        });
-
         connectionRef.current = peer;
         setIsCallActive(true);
     };
