@@ -3,8 +3,7 @@ import api from '../api/api';
 import { useChat } from '../context/ChatContext';
 import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X, Smile } from 'lucide-react';
 import MessageStatusIndicator from './MessageStatusIndicator';
-import data from '@emoji-mart/data';
-import Picker from '@emoji-mart/react';
+import EmojiPicker from 'emoji-picker-react';
 
 import VideoCall from './VideoCall';
 
@@ -514,16 +513,15 @@ const ChatArea = ({ onOpenSidebar }) => {
                             ref={emojiPickerRef}
                             className="absolute bottom-20 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden"
                         >
-                            <Picker
-                                data={data}
-                                onEmojiSelect={(emoji) => {
-                                    setNewMessage(prev => prev + emoji.native);
+                            <EmojiPicker
+                                onEmojiClick={(emojiData) => {
+                                    setNewMessage(prev => prev + emojiData.emoji);
                                     setShowEmojiPicker(false);
                                     inputRef.current?.focus();
                                 }}
                                 theme="dark"
-                                previewPosition="none"
-                                skinTonePosition="search"
+                                width={350}
+                                height={400}
                             />
                         </div>
                     )}
