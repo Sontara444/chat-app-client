@@ -20,23 +20,8 @@ const VideoCall = () => {
     const [micOn, setMicOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
 
-    useEffect(() => {
-        if (isCallActive || call.isReceivingCall) {
-            const constraints = {
-                video: callType === 'video',
-                audio: true
-            };
-
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then((currentStream) => {
-                    setStream(currentStream);
-                    if (myVideo.current && callType === 'video') {
-                        myVideo.current.srcObject = currentStream;
-                    }
-                })
-                .catch(err => console.error("Failed to get media", err));
-        }
-    }, [isCallActive, call.isReceivingCall, callType]);
+    // Media is obtained in ChatContext before peer creation
+    // This useEffect is no longer needed
 
     const toggleMic = () => {
         if (stream) {

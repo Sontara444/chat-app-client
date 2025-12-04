@@ -279,46 +279,96 @@ export const ChatProvider = ({ children }) => {
         }
     }, [socket]);
 
-    const answerCall = () => {
+    const answerCall = async () => {
         setCallAccepted(true);
-        const peer = new SimplePeer({ initiator: false, trickle: false, stream });
 
-        peer.on('signal', (data) => {
-            socket.emit('answer_call', { signal: data, to: call.from });
-        });
+        // Get media FIRST before creating peer
+        try {
+            const constraints = {
+                video: call.callType === 'video',
+                audio: true
+            };
 
-        peer.on('stream', (currentStream) => {
-            if (userVideo.current) {
-                userVideo.current.srcObject = currentStream;
+            const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            setStream(currentStream);
+
+            // Attach to local video if it's a video call
+            if (myVideo.current && call.callType === 'video') {
+                myVideo.current.srcObject = currentStream;
             }
-        });
 
-        peer.signal(call.signal);
-        connectionRef.current = peer;
+            // NOW create peer with the stream
+            const peer = new SimplePeer({
+                initiator: false,
+                trickle: false,
+                stream: currentStream  // Stream is now available!
+            });
+
+            peer.on('signal', (data) => {
+                socket.emit('answer_call', { signal: data, to: call.from });
+            });
+
+            peer.on('stream', (remoteStream) => {
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
+            });
+
+            peer.signal(call.signal);
+            connectionRef.current = peer;
+        } catch (err) {
+            console.error("Failed to get media:", err);
+            alert("Cannot access camera/microphone. Please grant permissions and try again.");
+        }
     };
 
-    const callUser = (id, type = 'video') => {
+    const callUser = async (id, type = 'video') => {
         setCallType(type);
-        const peer = new SimplePeer({ initiator: true, trickle: false, stream });
 
-        peer.on('signal', (data) => {
-            socket.emit('call_user', {
-                userToCall: id,
-                signalData: data,
-                from: socket.id,
-                name: JSON.parse(localStorage.getItem('user')).username,
-                callType: type
-            });
-        });
+        // Get media FIRST before creating peer
+        try {
+            const constraints = {
+                video: type === 'video',
+                audio: true
+            };
 
-        peer.on('stream', (currentStream) => {
-            if (userVideo.current) {
-                userVideo.current.srcObject = currentStream;
+            const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            setStream(currentStream);
+
+            // Attach to local video if it's a video call
+            if (myVideo.current && type === 'video') {
+                myVideo.current.srcObject = currentStream;
             }
-        });
 
-        connectionRef.current = peer;
-        setIsCallActive(true);
+            // NOW create peer with the stream
+            const peer = new SimplePeer({
+                initiator: true,
+                trickle: false,
+                stream: currentStream  // Stream is now available!
+            });
+
+            peer.on('signal', (data) => {
+                socket.emit('call_user', {
+                    userToCall: id,
+                    signalData: data,
+                    from: socket.id,
+                    name: JSON.parse(localStorage.getItem('user')).username,
+                    callType: type
+                });
+            });
+
+            peer.on('stream', (remoteStream) => {
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
+            });
+
+            connectionRef.current = peer;
+            setIsCallActive(true);
+        } catch (err) {
+            console.error("Failed to get media:", err);
+            alert("Cannot access camera/microphone. Please grant permissions and try again.");
+        }
     };
 
     const leaveCall = (emit = true) => {
