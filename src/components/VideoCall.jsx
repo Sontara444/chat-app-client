@@ -134,8 +134,8 @@ const VideoCall = () => {
                         )}
                     </div>
 
-                    {/* Picture-in-Picture (My Video) */}
-                    {callAccepted && !callEnded && callType === 'video' && (
+                    {/* Picture-in-Picture (My Video) - Shows during calling AND active call */}
+                    {callType === 'video' && stream && (
                         <div className="absolute bottom-6 right-6 w-48 h-36 rounded-2xl overflow-hidden bg-slate-950 border-2 border-violet-500/50 shadow-2xl">
                             {stream ? (
                                 <video
@@ -207,8 +207,8 @@ const VideoCall = () => {
                     <button
                         onClick={toggleMic}
                         className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${micOn
-                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                            ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                            : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                             } text-white backdrop-blur-sm hover:scale-110`}
                     >
                         {micOn ? <Mic size={24} /> : <MicOff size={24} />}
@@ -221,8 +221,8 @@ const VideoCall = () => {
                         <button
                             onClick={toggleVideo}
                             className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${videoOn
-                                    ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                                    : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                                 } text-white backdrop-blur-sm hover:scale-110`}
                         >
                             {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
