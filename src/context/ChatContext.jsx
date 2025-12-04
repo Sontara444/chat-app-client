@@ -113,19 +113,20 @@ export const ChatProvider = ({ children }) => {
         };
     }, [socket, currentChannel]);
 
-    // Join channel room
+    // Join channel room and load initial messages
     useEffect(() => {
         if (socket && currentChannel) {
             socket.emit('join_channel', currentChannel._id);
 
-            // Fetch messages for this channel
+            // Fetch ONLY recent messages (WhatsApp-style)
             const fetchMessages = async () => {
                 try {
                     setPage(1);
                     setHasMore(true);
-                    const response = await api.get(`/messages/${currentChannel._id}?page=1&limit=50`);
+                    // Load only 30 recent messages initially
+                    const response = await api.get(`/messages/${currentChannel._id}?page=1&limit=30`);
                     setMessages(response.data);
-                    if (response.data.length < 50) setHasMore(false);
+                    if (response.data.length < 30) setHasMore(false);
                 } catch (error) {
                     console.error("Error fetching messages", error);
                 }
@@ -212,11 +213,12 @@ export const ChatProvider = ({ children }) => {
         if (!hasMore) return;
         try {
             const nextPage = page + 1;
-            const response = await api.get(`/messages/${currentChannel._id}?page=${nextPage}&limit=50`);
+            // Load 30 messages per page for consistency
+            const response = await api.get(`/messages/${currentChannel._id}?page=${nextPage}&limit=30`);
             if (response.data.length > 0) {
                 setMessages(prev => [...response.data, ...prev]);
                 setPage(nextPage);
-                if (response.data.length < 50) setHasMore(false);
+                if (response.data.length < 30) setHasMore(false);
             } else {
                 setHasMore(false);
             }

@@ -23,6 +23,7 @@ const ChatArea = ({ onOpenSidebar }) => {
     const menuRef = useRef(null);
     const messageRefs = useRef({});
     const observerRef = useRef(null);
+    const initialScrollDone = useRef(false);
     const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
 
     // Close menu when clicking outside
@@ -51,13 +52,12 @@ const ChatArea = ({ onOpenSidebar }) => {
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToBottom = (smooth = true) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
     };
 
     // Track if user is near bottom
     const [isNearBottom, setIsNearBottom] = useState(true);
-    const previousMessagesLength = useRef(messages.length);
 
     // Detect if user is scrolled near bottom
     useEffect(() => {
@@ -74,30 +74,36 @@ const ChatArea = ({ onOpenSidebar }) => {
         return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Smooth scroll to bottom when new messages arrive (only if user is near bottom)
+    // SINGLE scroll to bottom on initial channel load
     useEffect(() => {
-        const messagesAdded = messages.length > previousMessagesLength.current;
-
-        if (messagesAdded && isNearBottom) {
-            // Small delay to ensure DOM is updated
+        if (currentChannel && messages.length > 0 && !initialScrollDone.current) {
+            // Wait for messages to render, then scroll ONCE
             setTimeout(() => {
-                scrollToBottom();
-            }, 100);
+                scrollToBottom(true); // Smooth scroll on initial load
+                initialScrollDone.current = true;
+            }, 150);
         }
+    }, [currentChannel?._id, messages.length]);
 
-        previousMessagesLength.current = messages.length;
-    }, [messages, isNearBottom]);
-
-    // Instant scroll to bottom on channel change (no animation - like WhatsApp)
+    // Reset scroll flag when changing channels
     useEffect(() => {
-        if (currentChannel) {
-            setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: "auto" }); // instant scroll
-            }, 100);
-        }
+        initialScrollDone.current = false;
     }, [currentChannel?._id]);
 
-    // Handle scroll-based pagination with stable scroll position
+    // Auto-scroll ONLY when new messages arrive AND user is at bottom
+    useEffect(() => {
+        if (!initialScrollDone.current) return; // Don't auto-scroll during initial load
+
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        // Only auto-scroll if user is near bottom
+        if (isNearBottom && messages.length > 0) {
+            scrollToBottom(true);
+        }
+    }, [messages.length, isNearBottom]); // Only trigger on message count change
+
+    // Infinite scroll upward - load older messages
     useEffect(() => {
         const container = messagesContainerRef.current;
         if (!container) return;
@@ -105,14 +111,14 @@ const ChatArea = ({ onOpenSidebar }) => {
         let isLoadingMore = false;
 
         const handleScroll = () => {
-            // Check if scrolled to top (with small threshold)
-            if (container.scrollTop < 100 && hasMore && !isLoadingMore) {
+            // Only load more if scrolled near top and not already loading
+            if (container.scrollTop < 50 && hasMore && !isLoadingMore) {
                 isLoadingMore = true;
                 const previousScrollHeight = container.scrollHeight;
                 const previousScrollTop = container.scrollTop;
 
                 loadMoreMessages().then(() => {
-                    // Maintain scroll position after loading older messages
+                    // Preserve scroll position (WhatsApp-style)
                     requestAnimationFrame(() => {
                         const newScrollHeight = container.scrollHeight;
                         const scrollDiff = newScrollHeight - previousScrollHeight;
