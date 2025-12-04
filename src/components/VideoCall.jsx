@@ -20,6 +20,7 @@ const VideoCall = () => {
     const [micOn, setMicOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
     const user = JSON.parse(localStorage.getItem('user'));
+    const remoteAudioRef = useRef(); // For playing remote audio in voice calls
 
     // Attach local video stream
     useEffect(() => {
@@ -27,6 +28,20 @@ const VideoCall = () => {
             myVideo.current.srcObject = stream;
         }
     }, [stream, callType]);
+
+    // Attach remote audio stream for voice calls
+    useEffect(() => {
+        if (callAccepted && userVideo.current) {
+            // For video calls, userVideo handles both video and audio
+            // For voice calls, we need a separate audio element
+            if (callType === 'audio' && remoteAudioRef.current && userVideo.current.srcObject) {
+                remoteAudioRef.current.srcObject = userVideo.current.srcObject;
+                remoteAudioRef.current.play().catch(err => {
+                    console.error('Error playing remote audio:', err);
+                });
+            }
+        }
+    }, [callAccepted, callType, userVideo.current?.srcObject]);
 
     const toggleMic = () => {
         if (stream) {
@@ -46,6 +61,9 @@ const VideoCall = () => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950/50 backdrop-blur-xl">
+            {/* Hidden audio element for voice calls */}
+            <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
             <div className="w-full h-full max-w-7xl mx-auto p-4 md:p-8 flex flex-col">
 
                 {/* Header */}
@@ -198,8 +216,8 @@ const VideoCall = () => {
                     <button
                         onClick={toggleMic}
                         className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${micOn
-                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                            ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                            : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                             } text-white backdrop-blur-sm hover:scale-110`}
                     >
                         {micOn ? <Mic size={24} /> : <MicOff size={24} />}
@@ -212,8 +230,8 @@ const VideoCall = () => {
                         <button
                             onClick={toggleVideo}
                             className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${videoOn
-                                    ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                                    : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                                 } text-white backdrop-blur-sm hover:scale-110`}
                         >
                             {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
