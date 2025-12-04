@@ -268,7 +268,6 @@ const ChatArea = ({ onOpenSidebar }) => {
         <div className="flex-1 flex flex-col h-full bg-slate-950 relative w-full">
             <VideoCall />
 
-            {/* Call User Modal */}
             {showCallModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowCallModal(false)}>
                     <div className="bg-slate-900 p-6 rounded-xl shadow-2xl border border-slate-800 w-full max-w-md m-4" onClick={e => e.stopPropagation()}>
