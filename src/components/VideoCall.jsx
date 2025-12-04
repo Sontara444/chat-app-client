@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useChat } from '../context/ChatContext';
 import { PhoneOff, Mic, MicOff, Video, VideoOff, Phone } from 'lucide-react';
 
@@ -12,16 +12,14 @@ const VideoCall = () => {
         call,
         answerCall,
         leaveCall,
-        setStream,
         isCallActive,
-        callType
+        callType,
+        remoteAudioRef
     } = useChat();
 
     const [micOn, setMicOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
     const [isSpeaking, setIsSpeaking] = useState(false);
-
-    const remoteAudioRef = useRef();
 
     // Attach local video stream
     useEffect(() => {
@@ -29,26 +27,6 @@ const VideoCall = () => {
             myVideo.current.srcObject = stream;
         }
     }, [stream, callType]);
-
-    // Attach remote stream to audio/video elements
-    useEffect(() => {
-        const handleRemoteStream = (remoteStream) => {
-            if (!remoteStream) return;
-
-            if (callType === 'video' && userVideo.current) {
-                userVideo.current.srcObject = remoteStream;
-            }
-
-            // Always attach audio stream for voice calls
-            if (remoteAudioRef.current) {
-                remoteAudioRef.current.srcObject = remoteStream;
-                console.log('✅ Remote audio attached');
-            }
-        };
-
-        // This will be called when peer.on('stream') fires in ChatContext
-        // The stream is attached via the ref
-    }, [callAccepted, callType]);
 
     // Voice activity detection
     useEffect(() => {
@@ -83,7 +61,7 @@ const VideoCall = () => {
 
     const toggleMic = () => {
         if (stream) {
-            stream.get AudioTracks()[0].enabled = !micOn;
+            stream.getAudioTracks()[0].enabled = !micOn;
             setMicOn(!micOn);
         }
     };

@@ -20,6 +20,18 @@ export const ChatProvider = ({ children }) => {
 
     // Initialize Socket
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const newSocket = io(import.meta.env.VITE_SOCKET_URL, {
+                auth: { token }
+            });
+            setSocket(newSocket);
+            return () => newSocket.close();
+        }
+    }, []);
+
+    // Fetch Channels
+    useEffect(() => {
         const fetchChannels = async () => {
             try {
                 const response = await api.get('/channels');
@@ -228,10 +240,12 @@ export const ChatProvider = ({ children }) => {
     const [isCallActive, setIsCallActive] = useState(false);
     const [callType, setCallType] = useState('video');
     const [callStartTime, setCallStartTime] = useState(null);
+    const [cleanupDone, setCleanupDone] = useState(false);
 
     const myVideo = useRef();
     const userVideo = useRef();
     const connectionRef = useRef();
+    const remoteAudioRef = useRef();
 
     // WebRTC Socket Listeners
     useEffect(() => {
@@ -245,7 +259,9 @@ export const ChatProvider = ({ children }) => {
 
         socket.on('call_accepted', (signal) => {
             setCallAccepted(true);
-            connectionRef.current.signal(signal);
+            if (connectionRef.current) {
+                connectionRef.current.signal(signal);
+            }
         });
 
         socket.on('end_call', () => {
@@ -254,15 +270,22 @@ export const ChatProvider = ({ children }) => {
             leaveCall(false);
         });
 
+        socket.on('user_left_call', ({ userId, name }) => {
+            sendMessage(`⚠️ ${name || 'User'} left the call`);
+            leaveCall(false);
+        });
+
         return () => {
             socket.off('call_user');
             socket.off('call_accepted');
             socket.off('end_call');
+            socket.off('user_left_call');
         };
     }, [socket]);
 
     const answerCall = async () => {
         setCallAccepted(true);
+        setCleanupDone(false);
 
         const startTime = new Date();
         setCallStartTime(startTime);
@@ -274,6 +297,8 @@ export const ChatProvider = ({ children }) => {
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
 
+            console.log('✅ Media obtained:', currentStream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
+
             const peer = new SimplePeer({ initiator: false, trickle: false, stream: currentStream });
 
             peer.on('signal', (data) => {
@@ -281,25 +306,61 @@ export const ChatProvider = ({ children }) => {
             });
 
             peer.on('stream', (remoteStream) => {
-                if (userVideo.current) userVideo.current.srcObject = remoteStream;
+                console.log('✅ Remote stream received:', remoteStream.getTracks().map(t => t.kind));
+
+                // Attach to video element
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
+
+                // ALWAYS attach to audio element for voice calls
+                if (remoteAudioRef.current) {
+                    remoteAudioRef.current.srcObject = remoteStream;
+                    console.log('✅ Remote audio attached');
+                }
+            });
+
+            // Monitor connection state
+            peer.on('connect', () => {
+                console.log('�� Peer connected');
+                socket.emit('call_started', { to: call.from });
+            });
+
+            peer.on('close', () => {
+                console.log('Connection closed');
+                if (!cleanupDone) {
+                    sendMessage(`⚠️ ${call.name} left the call`);
+                    leaveCall(false);
+                }
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                if (err.message !== 'Connection failed.') {
+                    alert('Call connection error');
+                }
             });
 
             peer.signal(call.signal);
             connectionRef.current = peer;
         } catch (err) {
             console.error("Failed to get media:", err);
-            alert("Cannot access camera/microphone.");
+            alert("Cannot access camera/microphone. Please grant permissions.");
+            leaveCall(false);
         }
     };
 
     const callUser = async (id, type = 'video') => {
         setCallType(type);
         setIsCallActive(true);
+        setCleanupDone(false);
 
         try {
             const constraints = { video: type === 'video', audio: true };
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
+
+            console.log('✅ Media obtained:', currentStream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
 
             const peer = new SimplePeer({ initiator: true, trickle: false, stream: currentStream });
 
@@ -314,31 +375,85 @@ export const ChatProvider = ({ children }) => {
             });
 
             peer.on('stream', (remoteStream) => {
-                if (userVideo.current) userVideo.current.srcObject = remoteStream;
+                console.log('✅ Remote stream received:', remoteStream.getTracks().map(t => t.kind));
+
+                // Attach to video element
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
+
+                // ALWAYS attach to audio element
+                if (remoteAudioRef.current) {
+                    remoteAudioRef.current.srcObject = remoteStream;
+                    console.log('✅ Remote audio attached');
+                }
             });
 
             peer.on('connect', () => {
+                console.log('✅ Peer connected');
                 const startTime = new Date();
                 setCallStartTime(startTime);
                 const timeStr = startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                 sendMessage(`📞 ${type === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
+                socket.emit('call_started', { to: id });
+            });
+
+            peer.on('close', () => {
+                console.log('Connection closed');
+                if (!cleanupDone) {
+                    sendMessage(`⚠️ Other user left the call`);
+                    leaveCall(false);
+                }
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                if (err.message !== 'Connection failed.') {
+                    alert('Call connection error');
+                }
             });
 
             connectionRef.current = peer;
         } catch (err) {
             console.error("Failed to get media:", err);
-            alert("Cannot access camera/microphone.");
+            alert("Cannot access camera/microphone. Please grant permissions.");
+            setIsCallActive(false);
         }
     };
 
     const leaveCall = (emit = true) => {
+        // Prevent multiple cleanup attempts
+        if (cleanupDone) {
+            console.log('Cleanup already done, skipping');
+            return;
+        }
+
+        setCleanupDone(true);
         setCallEnded(true);
         setIsCallActive(false);
 
-        if (connectionRef.current) connectionRef.current.destroy();
-        if (emit && callAccepted && !callEnded) socket.emit('end_call', { to: call.from });
+        // Destroy peer connection
+        if (connectionRef.current) {
+            try {
+                connectionRef.current.destroy();
+                connectionRef.current = null;
+            } catch (err) {
+                console.error('Error destroying peer:', err);
+            }
+        }
 
-        // Calculate call duration
+        // Notify other user
+        if (emit && callAccepted && !callEnded && socket) {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            socket.emit('user_left_call', {
+                to: call.from,
+                userId: user.id,
+                name: user.username
+            });
+            socket.emit('end_call', { to: call.from });
+        }
+
+        // Calculate duration and send message
         if (callAccepted && callStartTime) {
             const endTime = new Date();
             const durationMs = endTime - callStartTime;
@@ -351,16 +466,29 @@ export const ChatProvider = ({ children }) => {
             sendMessage(`⚠️ Missed ${call.callType === 'video' ? 'video' : 'voice'} call from ${call.name}`);
         }
 
+        // Reset state
         setCall({});
         setCallAccepted(false);
         setCallStartTime(null);
 
+        // Stop media streams
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
+            try {
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log(`Stopped ${track.kind} track`);
+                });
+                setStream(null);
+            } catch (err) {
+                console.error('Error stopping streams:', err);
+            }
         }
 
-        window.location.reload();
+        // Reset cleanup flag after a delay
+        setTimeout(() => {
+            setCleanupDone(false);
+            window.location.reload();
+        }, 1000);
     };
 
     const value = {
@@ -370,7 +498,7 @@ export const ChatProvider = ({ children }) => {
         deleteChannel, onlineUsers, loading,
         call, callAccepted, myVideo, userVideo, stream, name, setName,
         callEnded, isCallActive, setIsCallActive, setStream, answerCall,
-        callUser, leaveCall, callType
+        callUser, leaveCall, callType, remoteAudioRef
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
