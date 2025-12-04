@@ -3,8 +3,10 @@ import api from '../api/api';
 import { useChat } from '../context/ChatContext';
 import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X } from 'lucide-react';
 
+import VideoCall from './VideoCall';
+
 const ChatArea = ({ onOpenSidebar }) => {
-    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel } = useChat();
+    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel, onlineUsers, callUser } = useChat();
     const [newMessage, setNewMessage] = useState('');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState('');
@@ -13,6 +15,8 @@ const ChatArea = ({ onOpenSidebar }) => {
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [showCallModal, setShowCallModal] = useState(false);
+    const [callType, setCallType] = useState('video');
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const menuRef = useRef(null);
@@ -204,6 +208,47 @@ const ChatArea = ({ onOpenSidebar }) => {
 
     return (
         <div className="flex-1 flex flex-col h-full bg-slate-950 relative w-full">
+            <VideoCall />
+
+            {/* Call User Modal */}
+            {showCallModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowCallModal(false)}>
+                    <div className="bg-slate-900 p-6 rounded-xl shadow-2xl border border-slate-800 w-full max-w-md m-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-white font-bold text-lg">Start a Call</h3>
+                            <button onClick={() => setShowCallModal(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+                        </div>
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {onlineUsers.filter(u => u._id !== user.id).length === 0 ? (
+                                <p className="text-slate-400 text-center py-4">No other users online.</p>
+                            ) : (
+                                onlineUsers.filter(u => u._id !== user.id).map(onlineUser => (
+                                    <button
+                                        key={onlineUser._id}
+                                        onClick={() => {
+                                            callUser(onlineUser._id, callType);
+                                            setShowCallModal(false);
+                                        }}
+                                        className="w-full flex items-center p-3 hover:bg-slate-800 rounded-lg transition-colors group"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-sm font-bold text-white mr-3">
+                                            {onlineUser.username?.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-white font-medium group-hover:text-violet-400 transition-colors">{onlineUser.username}</p>
+                                            <p className="text-xs text-green-400">Online</p>
+                                        </div>
+                                        <div className="ml-auto">
+                                            <Video size={20} className="text-slate-500 group-hover:text-violet-500" />
+                                        </div>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex items-center">
@@ -229,8 +274,8 @@ const ChatArea = ({ onOpenSidebar }) => {
                 </div>
                 <div className="flex items-center space-x-2 md:space-x-4 text-slate-400">
                     <button onClick={() => setIsSearchOpen(!isSearchOpen)} className={`hover:text-white transition-colors ${isSearchOpen ? 'text-violet-500' : ''}`}><Search size={20} /></button>
-                    <button className="hover:text-white transition-colors hidden sm:block"><Phone size={20} /></button>
-                    <button className="hover:text-white transition-colors hidden sm:block"><Video size={20} /></button>
+                    <button onClick={() => { setShowCallModal(true); setCallType('audio'); }} className="hover:text-white transition-colors hidden sm:block"><Phone size={20} /></button>
+                    <button onClick={() => { setShowCallModal(true); setCallType('video'); }} className="hover:text-white transition-colors hidden sm:block"><Video size={20} /></button>
                     <div className="relative" ref={menuRef}>
                         <button onClick={() => setShowMenu(!showMenu)} className="hover:text-white transition-colors">
                             <MoreVertical size={20} />
