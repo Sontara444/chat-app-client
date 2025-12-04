@@ -530,9 +530,9 @@ const ChatArea = ({ onOpenSidebar }) => {
                     <button
                         type="button"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-400 transition-colors z-10"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full text-slate-400 hover:text-violet-400 hover:bg-slate-700/50 transition-all z-10"
                     >
-                        <Smile size={20} />
+                        <Smile size={22} />
                     </button>
 
                     <textarea
@@ -540,7 +540,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                         value={newMessage}
                         onChange={handleTyping}
                         placeholder={`Message #${currentChannel.name}`}
-                        className="w-full bg-slate-800 text-slate-100 rounded-xl pl-12 pr-12 py-3.5 outline-none resize-none h-14 focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full bg-slate-800 text-slate-100 rounded-2xl pl-12 pr-14 py-4 outline-none resize-none h-14 focus:ring-2 focus:ring-violet-500/50 transition-all placeholder:text-slate-500"
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
@@ -548,8 +548,11 @@ const ChatArea = ({ onOpenSidebar }) => {
                             }
                         }}
                     />
-                    <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700 text-white p-2.5 rounded-full transition-colors">
-                        <Send size={18} />
+                    <button
+                        type="submit"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700 text-white p-2.5 rounded-full transition-all shadow-lg hover:shadow-violet-500/25 active:scale-95 flex items-center justify-center"
+                    >
+                        <Send size={20} className="ml-0.5" />
                     </button>
                 </form>
 
