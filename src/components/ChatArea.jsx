@@ -53,60 +53,68 @@ const ChatArea = ({ onOpenSidebar }) => {
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToBottom = (behavior = "smooth") => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
-    // Simple: scroll to bottom when channel changes
-    useEffect(() => {
-        if (currentChannel && messages.length > 0) {
-            setTimeout(() => scrollToBottom(), 100);
-        }
-    }, [currentChannel?._id]);
-
-    // Simple: auto-scroll when new messages arrive (if at bottom)
-    const previousCount = useRef(0);
-    useEffect(() => {
-        if (messages.length > previousCount.current) {
-            const container = messagesContainerRef.current;
-            if (container) {
-                const { scrollTop, scrollHeight, clientHeight } = container;
-                const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-                if (isAtBottom) {
-                    setTimeout(() => scrollToBottom(), 50);
-                }
-            }
-        }
-        previousCount.current = messages.length;
-    }, [messages.length]);
-
-    // Simple: load more messages on scroll to top
-    useEffect(() => {
+    // Track if user is at bottom
+    const handleScroll = () => {
         const container = messagesContainerRef.current;
         if (!container) return;
 
-        let loading = false;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
 
-        const handleScroll = () => {
-            if (container.scrollTop < 50 && hasMore && !loading) {
-                loading = true;
-                const oldHeight = container.scrollHeight;
-                const oldScroll = container.scrollTop;
+        // Pagination: Load more when near top
+        if (scrollTop < 50 && hasMore && !loading) {
+            const oldHeight = container.scrollHeight;
+            const oldScroll = container.scrollTop;
 
-                loadMoreMessages().then(() => {
-                    setTimeout(() => {
-                        container.scrollTop = oldScroll + (container.scrollHeight - oldHeight);
-                        loading = false;
-                    }, 10);
-                }).catch(() => {
-                    loading = false;
-                });
-            }
-        };
+            loadMoreMessages().then(() => {
+                // Scroll restoration handled in useLayoutEffect
+                // We store the old height to calculate offset
+                container.dataset.oldHeight = oldHeight;
+            });
+        }
+    };
 
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [hasMore, loadMoreMessages]);
+    // Initial scroll to bottom on channel change
+    useEffect(() => {
+        if (currentChannel && messages.length > 0) {
+            scrollToBottom("auto"); // Instant scroll on load
+        }
+    }, [currentChannel?._id]);
+
+    // Handle scroll restoration and auto-scroll
+    React.useLayoutEffect(() => {
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        // 1. Pagination Restoration
+        if (container.dataset.oldHeight) {
+            const oldHeight = parseInt(container.dataset.oldHeight);
+            const newHeight = container.scrollHeight;
+            const heightDifference = newHeight - oldHeight;
+
+            // Restore scroll position instantly
+            container.scrollTop = heightDifference;
+            delete container.dataset.oldHeight;
+            return;
+        }
+
+        // 2. Auto-scroll for new messages
+        if (isAtBottomRef.current) {
+            scrollToBottom();
+        }
+    }, [messages]);
+
+    useEffect(() => {
+        const container = messagesContainerRef.current;
+        if (container) {
+            container.addEventListener('scroll', handleScroll);
+            return () => container.removeEventListener('scroll', handleScroll);
+        }
+    }, [hasMore, loading]);
 
     const handleSend = (e) => {
         e.preventDefault();
