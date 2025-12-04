@@ -55,10 +55,6 @@ export const ChatProvider = ({ children }) => {
 
         socket.on('receive_message', (message) => {
             if (currentChannel && message.channel === currentChannel._id) {
-                setMessages((prev) => [message, ...prev]); // Newest first for chat view if reversed? Wait, existing code appends.
-                // The existing code appends: setMessages((prev) => [...prev, message]);
-                // But getMessages returns newest first, then reverses. So messages are [oldest, ..., newest].
-                // So appending is correct.
                 setMessages((prev) => [...prev, message]);
             }
         });
@@ -240,6 +236,7 @@ export const ChatProvider = ({ children }) => {
         }
     };
 
+    // WebRTC State
     const [call, setCall] = useState({});
     const [callAccepted, setCallAccepted] = useState(false);
     const [callEnded, setCallEnded] = useState(false);
@@ -252,6 +249,7 @@ export const ChatProvider = ({ children }) => {
     const userVideo = useRef();
     const connectionRef = useRef();
 
+    // WebRTC Socket Listeners
     useEffect(() => {
         if (!socket) return;
 
@@ -282,7 +280,6 @@ export const ChatProvider = ({ children }) => {
     const answerCall = async () => {
         setCallAccepted(true);
 
-        // Get media FIRST before creating peer
         try {
             const constraints = {
                 video: call.callType === 'video',
@@ -292,16 +289,14 @@ export const ChatProvider = ({ children }) => {
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
 
-            // Attach to local video if it's a video call
-            if (myVideo.current && call.callType === 'video') {
-                myVideo.current.srcObject = currentStream;
-            }
+            console.log('✅ Media obtained for call receiver');
+            console.log('Video tracks:', currentStream.getVideoTracks().length);
+            console.log('Audio tracks:', currentStream.getAudioTracks().length);
 
-            // NOW create peer with the stream
             const peer = new SimplePeer({
                 initiator: false,
                 trickle: false,
-                stream: currentStream  // Stream is now available!
+                stream: currentStream
             });
 
             peer.on('signal', (data) => {
@@ -309,6 +304,7 @@ export const ChatProvider = ({ children }) => {
             });
 
             peer.on('stream', (remoteStream) => {
+                console.log('✅ Remote stream received');
                 if (userVideo.current) {
                     userVideo.current.srcObject = remoteStream;
                 }
@@ -325,7 +321,6 @@ export const ChatProvider = ({ children }) => {
     const callUser = async (id, type = 'video') => {
         setCallType(type);
 
-        // Get media FIRST before creating peer
         try {
             const constraints = {
                 video: type === 'video',
@@ -335,16 +330,14 @@ export const ChatProvider = ({ children }) => {
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
 
-            // Attach to local video if it's a video call
-            if (myVideo.current && type === 'video') {
-                myVideo.current.srcObject = currentStream;
-            }
+            console.log('✅ Media obtained for call initiator');
+            console.log('Video tracks:', currentStream.getVideoTracks().length);
+            console.log('Audio tracks:', currentStream.getAudioTracks().length);
 
-            // NOW create peer with the stream
             const peer = new SimplePeer({
                 initiator: true,
                 trickle: false,
-                stream: currentStream  // Stream is now available!
+                stream: currentStream
             });
 
             peer.on('signal', (data) => {
@@ -358,6 +351,7 @@ export const ChatProvider = ({ children }) => {
             });
 
             peer.on('stream', (remoteStream) => {
+                console.log('✅ Remote stream received');
                 if (userVideo.current) {
                     userVideo.current.srcObject = remoteStream;
                 }
@@ -377,29 +371,25 @@ export const ChatProvider = ({ children }) => {
         if (connectionRef.current) {
             connectionRef.current.destroy();
         }
-        // Notify other user
+
         if (emit && callAccepted && !callEnded) {
-            socket.emit('end_call', { to: call.from }); // This might be wrong if we are the caller.
-            // We need to know who we are talking to.
+            socket.emit('end_call', { to: call.from });
         }
 
-        // Save history
         if (callAccepted) {
             const typeText = callType === 'video' ? 'Video Call' : 'Voice Call';
             sendMessage(`${typeText} ended.`);
         }
 
-        // Reset state
         setCall({});
         setCallAccepted(false);
 
-        // Stop stream tracks
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
         }
 
-        window.location.reload(); // Simple way to clean up for now
+        window.location.reload();
     };
 
     const value = {

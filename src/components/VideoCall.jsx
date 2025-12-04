@@ -20,8 +20,20 @@ const VideoCall = () => {
     const [micOn, setMicOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
 
-    // Media is obtained in ChatContext before peer creation
-    // This useEffect is no longer needed
+    // Attach local video stream when it becomes available
+    useEffect(() => {
+        if (stream && myVideo.current && callType === 'video') {
+            myVideo.current.srcObject = stream;
+            console.log('✅ Local video attached:', stream.getVideoTracks().length, 'video tracks');
+        }
+    }, [stream, callType]);
+
+    // Attach remote video stream when call is accepted
+    useEffect(() => {
+        if (callAccepted && userVideo.current) {
+            console.log('✅ Remote video ready');
+        }
+    }, [callAccepted]);
 
     const toggleMic = () => {
         if (stream) {
