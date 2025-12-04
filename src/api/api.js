@@ -9,7 +9,6 @@ const request = async (endpoint, method, body = null) => {
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
-    console.log(token);
 
     const config = {
         method,
@@ -24,7 +23,6 @@ const request = async (endpoint, method, body = null) => {
     const data = await response.json();
 
     if (!response.ok) {
-        // Mimic axios error structure for compatibility
         const error = new Error(data.message || 'Something went wrong');
         error.response = { data };
         throw error;
