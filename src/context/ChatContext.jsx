@@ -16,9 +16,24 @@ export const ChatProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(1);
+
     const [typingUsers, setTypingUsers] = useState({});
 
     // Initialize Socket
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const newSocket = io(import.meta.env.VITE_SOCKET_URL, {
+                auth: { token }
+            });
+
+            setSocket(newSocket);
+
+            return () => newSocket.close();
+        }
+    }, []);
+
+    // Fetch Channels
     useEffect(() => {
         const fetchChannels = async () => {
             try {
@@ -30,29 +45,8 @@ export const ChatProvider = ({ children }) => {
                 setLoading(false);
             }
         };
+
         fetchChannels();
-
-        // Initialize Socket.IO connection
-        const token = localStorage.getItem('token');
-        if (token) {
-            const socketConnection = io(import.meta.env.VITE_BASE_URL || 'http://localhost:5000', {
-                auth: { token }
-            });
-
-            socketConnection.on('connect', () => {
-                console.log('✅ Socket connected:', socketConnection.id);
-            });
-
-            socketConnection.on('connect_error', (error) => {
-                console.error('❌ Socket connection error:', error);
-            });
-
-            setSocket(socketConnection);
-
-            return () => {
-                socketConnection.close();
-            };
-        }
     }, []);
 
     // Listen for messages and online users
@@ -108,6 +102,7 @@ export const ChatProvider = ({ children }) => {
         if (socket && currentChannel) {
             socket.emit('join_channel', currentChannel._id);
 
+            // Fetch messages for this channel
             const fetchMessages = async () => {
                 try {
                     setPage(1);
@@ -167,7 +162,7 @@ export const ChatProvider = ({ children }) => {
             console.error("Error creating channel", error);
             throw error;
         }
-    };
+    }
 
     const joinChannel = async (channelId) => {
         try {
@@ -249,7 +244,6 @@ export const ChatProvider = ({ children }) => {
     const [name, setName] = useState('');
     const [isCallActive, setIsCallActive] = useState(false);
     const [callType, setCallType] = useState('video');
-    const [callStartTime, setCallStartTime] = useState(null);
 
     const myVideo = useRef();
     const userVideo = useRef();
@@ -280,50 +274,71 @@ export const ChatProvider = ({ children }) => {
             socket.off('call_user');
             socket.off('call_accepted');
             socket.off('end_call');
-        };
+        }
     }, [socket]);
 
     const answerCall = async () => {
         setCallAccepted(true);
 
-        const startTime = new Date();
-        setCallStartTime(startTime);
-        const timeStr = startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        sendMessage(`📞 ${call.callType === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
-
         try {
-            const constraints = { video: call.callType === 'video', audio: true };
+            const constraints = {
+                video: call.callType === 'video',
+                audio: true
+            };
+
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
 
-            const peer = new SimplePeer({ initiator: false, trickle: false, stream: currentStream });
+            console.log('✅ Media obtained for call receiver');
+            console.log('Video tracks:', currentStream.getVideoTracks().length);
+            console.log('Audio tracks:', currentStream.getAudioTracks().length);
+
+            const peer = new SimplePeer({
+                initiator: false,
+                trickle: false,
+                stream: currentStream
+            });
 
             peer.on('signal', (data) => {
                 socket.emit('answer_call', { signal: data, to: call.from });
             });
 
             peer.on('stream', (remoteStream) => {
-                if (userVideo.current) userVideo.current.srcObject = remoteStream;
+                console.log('✅ Remote stream received');
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
             });
 
             peer.signal(call.signal);
             connectionRef.current = peer;
         } catch (err) {
             console.error("Failed to get media:", err);
-            alert("Cannot access camera/microphone.");
+            alert("Cannot access camera/microphone. Please grant permissions and try again.");
         }
     };
 
     const callUser = async (id, type = 'video') => {
         setCallType(type);
-        setIsCallActive(true);
 
         try {
-            const constraints = { video: type === 'video', audio: true };
+            const constraints = {
+                video: type === 'video',
+                audio: true
+            };
+
             const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(currentStream);
 
-            const peer = new SimplePeer({ initiator: true, trickle: false, stream: currentStream });
+            console.log('✅ Media obtained for call initiator');
+            console.log('Video tracks:', currentStream.getVideoTracks().length);
+            console.log('Audio tracks:', currentStream.getAudioTracks().length);
+
+            const peer = new SimplePeer({
+                initiator: true,
+                trickle: false,
+                stream: currentStream
+            });
 
             peer.on('signal', (data) => {
                 socket.emit('call_user', {
@@ -336,46 +351,38 @@ export const ChatProvider = ({ children }) => {
             });
 
             peer.on('stream', (remoteStream) => {
-                if (userVideo.current) userVideo.current.srcObject = remoteStream;
-            });
-
-            peer.on('connect', () => {
-                const startTime = new Date();
-                setCallStartTime(startTime);
-                const timeStr = startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                sendMessage(`📞 ${type === 'video' ? 'Video' : 'Voice'} call started at ${timeStr}`);
+                console.log('✅ Remote stream received');
+                if (userVideo.current) {
+                    userVideo.current.srcObject = remoteStream;
+                }
             });
 
             connectionRef.current = peer;
+            setIsCallActive(true);
         } catch (err) {
             console.error("Failed to get media:", err);
-            alert("Cannot access camera/microphone.");
+            alert("Cannot access camera/microphone. Please grant permissions and try again.");
         }
     };
 
     const leaveCall = (emit = true) => {
         setCallEnded(true);
         setIsCallActive(false);
+        if (connectionRef.current) {
+            connectionRef.current.destroy();
+        }
 
-        if (connectionRef.current) connectionRef.current.destroy();
-        if (emit && callAccepted && !callEnded) socket.emit('end_call', { to: call.from });
+        if (emit && callAccepted && !callEnded) {
+            socket.emit('end_call', { to: call.from });
+        }
 
-        // Calculate call duration
-        if (callAccepted && callStartTime) {
-            const endTime = new Date();
-            const durationMs = endTime - callStartTime;
-            const minutes = Math.floor(durationMs / 60000);
-            const seconds = Math.floor((durationMs % 60000) / 1000);
-            const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            const typeText = callType === 'video' ? 'Video' : 'Voice';
-            sendMessage(`🛑 ${typeText} call ended — duration ${durationStr}`);
-        } else if (call.isReceivingCall && !callAccepted) {
-            sendMessage(`⚠️ Missed ${call.callType === 'video' ? 'video' : 'voice'} call from ${call.name}`);
+        if (callAccepted) {
+            const typeText = callType === 'video' ? 'Video Call' : 'Voice Call';
+            sendMessage(`${typeText} ended.`);
         }
 
         setCall({});
         setCallAccepted(false);
-        setCallStartTime(null);
 
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
@@ -386,13 +393,41 @@ export const ChatProvider = ({ children }) => {
     };
 
     const value = {
-        socket, channels, currentChannel, setCurrentChannel, messages, sendMessage,
-        createChannel, joinChannel, leaveChannel, loadMoreMessages, hasMore,
-        typingUsers, sendTyping, editMessage, deleteMessage, updateChannel,
-        deleteChannel, onlineUsers, loading,
-        call, callAccepted, myVideo, userVideo, stream, name, setName,
-        callEnded, isCallActive, setIsCallActive, setStream, answerCall,
-        callUser, leaveCall, callType
+        socket,
+        channels,
+        currentChannel,
+        setCurrentChannel,
+        messages,
+        sendMessage,
+        createChannel,
+        joinChannel,
+        leaveChannel,
+        loadMoreMessages,
+        hasMore,
+        typingUsers,
+        sendTyping,
+        editMessage,
+        deleteMessage,
+        updateChannel,
+        deleteChannel,
+        onlineUsers,
+        loading,
+        // WebRTC
+        call,
+        callAccepted,
+        myVideo,
+        userVideo,
+        stream,
+        name,
+        setName,
+        callEnded,
+        isCallActive,
+        setIsCallActive,
+        setStream,
+        answerCall,
+        callUser,
+        leaveCall,
+        callType
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
