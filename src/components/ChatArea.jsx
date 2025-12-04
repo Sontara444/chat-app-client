@@ -53,32 +53,45 @@ const ChatArea = ({ onOpenSidebar }) => {
         }
     };
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const isInitialLoad = useRef(true);
+
+    const scrollToBottom = (behavior = "smooth") => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
-    // Simple: scroll to bottom when channel changes
+    // Reset initial load state when channel changes
     useEffect(() => {
-        if (currentChannel && messages.length > 0) {
-            setTimeout(() => scrollToBottom(), 100);
+        if (currentChannel) {
+            isInitialLoad.current = true;
         }
     }, [currentChannel?._id]);
 
-    // Simple: auto-scroll when new messages arrive (if at bottom)
+    // Smart scroll: Instant on load, Smooth on new messages
     const previousCount = useRef(0);
     useEffect(() => {
-        if (messages.length > previousCount.current) {
-            const container = messagesContainerRef.current;
-            if (container) {
-                const { scrollTop, scrollHeight, clientHeight } = container;
-                const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-                if (isAtBottom) {
-                    setTimeout(() => scrollToBottom(), 50);
-                }
+        const container = messagesContainerRef.current;
+        if (!container) return;
+
+        // If it's the initial load for this channel
+        if (isInitialLoad.current && messages.length > 0) {
+            // Force instant scroll to bottom
+            setTimeout(() => {
+                scrollToBottom("auto");
+                isInitialLoad.current = false;
+            }, 100);
+        }
+        // If new messages arrived (not initial load)
+        else if (messages.length > previousCount.current) {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+            // Auto-scroll if user was at bottom
+            if (isAtBottom) {
+                setTimeout(() => scrollToBottom("smooth"), 50);
             }
         }
         previousCount.current = messages.length;
-    }, [messages.length]);
+    }, [messages.length, currentChannel?._id]);
 
     // Simple: load more messages on scroll to top
     useEffect(() => {
