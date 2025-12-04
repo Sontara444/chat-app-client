@@ -83,7 +83,7 @@ const VideoCall = () => {
 
     const toggleMic = () => {
         if (stream) {
-            stream.get AudioTracks()[0].enabled = !micOn;
+            stream.getAudioTracks()[0].enabled = !micOn;
             setMicOn(!micOn);
         }
     };
