@@ -31,6 +31,28 @@ export const ChatProvider = ({ children }) => {
             }
         };
         fetchChannels();
+
+        // Initialize Socket.IO connection
+        const token = localStorage.getItem('token');
+        if (token) {
+            const socketConnection = io(import.meta.env.VITE_BASE_URL || 'http://localhost:5000', {
+                auth: { token }
+            });
+
+            socketConnection.on('connect', () => {
+                console.log('✅ Socket connected:', socketConnection.id);
+            });
+
+            socketConnection.on('connect_error', (error) => {
+                console.error('❌ Socket connection error:', error);
+            });
+
+            setSocket(socketConnection);
+
+            return () => {
+                socketConnection.close();
+            };
+        }
     }, []);
 
     // Listen for messages and online users

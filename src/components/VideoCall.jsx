@@ -30,25 +30,16 @@ const VideoCall = () => {
         }
     }, [stream, callType]);
 
-    // Attach remote stream to audio/video elements
+    // Attach remote stream when peer connection sends it
     useEffect(() => {
-        const handleRemoteStream = (remoteStream) => {
-            if (!remoteStream) return;
-
-            if (callType === 'video' && userVideo.current) {
-                userVideo.current.srcObject = remoteStream;
-            }
-
-            // Always attach audio stream for voice calls
-            if (remoteAudioRef.current) {
+        if (callAccepted && userVideo.current?.srcObject) {
+            const remoteStream = userVideo.current.srcObject;
+            if (remoteAudioRef.current && remoteStream) {
                 remoteAudioRef.current.srcObject = remoteStream;
-                console.log('✅ Remote audio attached');
+                console.log('✅ Remote audio attached to audio element');
             }
-        };
-
-        // This will be called when peer.on('stream') fires in ChatContext
-        // The stream is attached via the ref
-    }, [callAccepted, callType]);
+        }
+    }, [callAccepted, userVideo.current?.srcObject]);
 
     // Voice activity detection
     useEffect(() => {
