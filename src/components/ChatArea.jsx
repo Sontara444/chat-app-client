@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../api/api';
 import { useChat } from '../context/ChatContext';
 import { Send, Hash, MoreVertical, Phone, Video, ArrowUp, Edit2, Trash2, Search, X } from 'lucide-react';
+import MessageStatusIndicator from './MessageStatusIndicator';
 
 import VideoCall from './VideoCall';
 
 const ChatArea = ({ onOpenSidebar }) => {
-    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel, onlineUsers, callUser } = useChat();
+    const { currentChannel, messages, sendMessage, loadMoreMessages, hasMore, typingUsers, sendTyping, editMessage, deleteMessage, leaveChannel, onlineUsers, callUser, markMessagesAsRead } = useChat();
     const [newMessage, setNewMessage] = useState('');
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState('');
@@ -20,6 +21,8 @@ const ChatArea = ({ onOpenSidebar }) => {
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const menuRef = useRef(null);
+    const messageRefs = useRef({});
+    const observerRef = useRef(null);
     const user = JSON.parse(localStorage.getItem('user')); // Get current user for bubble styling
 
     // Close menu when clicking outside
@@ -179,6 +182,105 @@ const ChatArea = ({ onOpenSidebar }) => {
 
         return () => clearTimeout(timeoutId);
     }, [searchQuery, currentChannel]);
+
+    // Helper function to format date sections
+    const formatDateSection = (date) => {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const messageDate = new Date(date);
+
+        // Reset time parts for comparison
+        today.setHours(0, 0, 0, 0);
+        yesterday.setHours(0, 0, 0, 0);
+        messageDate.setHours(0, 0, 0, 0);
+
+        if (messageDate.getTime() === today.getTime()) {
+            return 'Today';
+        } else if (messageDate.getTime() === yesterday.getTime()) {
+            return 'Yesterday';
+        } else {
+            return messageDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+    };
+
+    // Helper function to check if we should show timestamp
+    const shouldShowTimestamp = (currentMsg, nextMsg, index) => {
+        if (!nextMsg) return true; // Always show on last message in cluster
+
+        const currentTime = new Date(currentMsg.timestamp);
+        const nextTime = new Date(nextMsg.timestamp);
+        const timeDiff = (nextTime - currentTime) / 1000 / 60; // difference in minutes
+
+        // Show timestamp if more than 5 minutes gap or different sender
+        return timeDiff > 5 || currentMsg.sender._id !== nextMsg.sender._id;
+    };
+
+    // Group messages by day
+    const groupedMessages = React.useMemo(() => {
+        const groups = [];
+        let currentGroup = null;
+
+        messages.forEach((msg, index) => {
+            const msgDate = new Date(msg.timestamp);
+            msgDate.setHours(0, 0, 0, 0);
+            const dateKey = msgDate.getTime();
+
+            if (!currentGroup || currentGroup.dateKey !== dateKey) {
+                currentGroup = {
+                    dateKey,
+                    dateLabel: formatDateSection(msg.timestamp),
+                    messages: []
+                };
+                groups.push(currentGroup);
+            }
+
+            currentGroup.messages.push({ ...msg, originalIndex: index });
+        });
+
+        return groups;
+    }, [messages]);
+
+    // Intersection Observer for auto-read receipts
+    useEffect(() => {
+        if (!currentChannel || !user) return;
+
+        // Create observer
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                const visibleMessageIds = [];
+
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const messageId = entry.target.dataset.messageId;
+                        const senderId = entry.target.dataset.senderId;
+
+                        // Only mark as read if it's not our own message
+                        if (messageId && senderId !== user.id) {
+                            visibleMessageIds.push(messageId);
+                        }
+                    }
+                });
+
+                // Send read receipts for visible messages
+                if (visibleMessageIds.length > 0) {
+                    markMessagesAsRead(visibleMessageIds);
+                }
+            },
+            { threshold: 0.5, root: messagesContainerRef.current }
+        );
+
+        // Observe all message elements
+        Object.values(messageRefs.current).forEach((ref) => {
+            if (ref) observerRef.current.observe(ref);
+        });
+
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        };
+    }, [messages, currentChannel, user, markMessagesAsRead]);
 
     if (!currentChannel) {
         return (
@@ -348,69 +450,91 @@ const ChatArea = ({ onOpenSidebar }) => {
 
             {/* Messages */}
             <div
-                className="flex-1 overflow-y-auto p-6 space-y-6 no-"
+                className="flex-1 overflow-y-auto p-6 space-y-6"
                 ref={messagesContainerRef}
             >
-                {messages.map((msg, index) => {
-                    const isMe = msg.sender._id === user?.id;
-                    const isSameUser = index > 0 && messages[index - 1].sender._id === msg.sender._id;
-                    const isEditing = editingMessageId === msg._id;
-
-                    return (
-                        <div key={`${msg._id}-${msg.timestamp}-${index}`}
-                            className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSameUser ? 'mt-1' : 'mt-4'} group/message`}>
-                            {!isMe && !isSameUser && (
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white mr-3 shadow-lg shrink-0">
-                                    {msg.sender.username?.substring(0, 2).toUpperCase()}
-                                </div>
-                            )}
-                            {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
-
-                            <div className={`max-w-[90%] md:max-w-[70%] relative`}>
-                                {isEditing ? (
-                                    <div className="flex flex-col space-y-2">
-                                        <textarea
-                                            value={editContent}
-                                            onChange={(e) => setEditContent(e.target.value)}
-                                            className="bg-slate-800 text-slate-200 rounded-xl p-3 text-sm border border-violet-500 outline-none w-full min-w-[200px]"
-                                            rows="2"
-                                        />
-                                        <div className="flex justify-end space-x-2">
-                                            <button onClick={() => setEditingMessageId(null)} className="text-xs text-slate-400 hover:text-white">Cancel</button>
-                                            <button onClick={handleSaveEdit} className="text-xs bg-violet-600 text-white px-3 py-1 rounded-md hover:bg-violet-500">Save</button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className={`px-4 py-3 rounded-2xl text-[15px] shadow-lg leading-relaxed relative group-hover/message:shadow-xl transition-all ${isMe
-                                            ? 'bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-md'
-                                            : 'bg-slate-800/90 text-slate-100 rounded-bl-md border border-slate-700/50'
-                                            }`}>
-                                            {msg.content}
-                                            {/* Message Actions */}
-                                            {isMe && (
-                                                <div className="absolute -top-9 right-0 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-lg shadow-2xl p-1.5 flex space-x-1 opacity-0 group-hover/message:opacity-100 transition-all z-10">
-                                                    <button onClick={() => handleEdit(msg)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-violet-400 transition-colors">
-                                                        <Edit2 size={14} />
-                                                    </button>
-                                                    <button onClick={() => deleteMessage(msg._id)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {/* Sender Name and Time Below Every Bubble */}
-                                        <div className={`flex items-center mt-1.5 text-[11px] ${isMe ? 'justify-end text-slate-400' : 'justify-start text-slate-500'} px-1`}>
-                                            <span className="font-semibold">{msg.sender.username}</span>
-                                            <span className="mx-1.5 text-slate-600">•</span>
-                                            <span className="font-normal">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                    </>
-                                )}
+                {groupedMessages.map((group) => (
+                    <div key={group.dateKey}>
+                        {/* Day Separator */}
+                        <div className="flex items-center justify-center my-4">
+                            <div className="bg-slate-800/60 px-3 py-1 rounded-full text-xs text-slate-400 font-medium">
+                                {group.dateLabel}
                             </div>
                         </div>
-                    );
-                })}
+
+                        {/* Messages for this day */}
+                        {group.messages.map((msg, index) => {
+                            const isMe = msg.sender._id === user?.id;
+                            const isSameUser = index > 0 && group.messages[index - 1].sender._id === msg.sender._id;
+                            const isEditing = editingMessageId === msg._id;
+                            const nextMsg = group.messages[index + 1];
+                            const showTimestamp = shouldShowTimestamp(msg, nextMsg, index);
+
+                            return (
+                                <div
+                                    key={msg._id}
+                                    ref={(el) => messageRefs.current[msg._id] = el}
+                                    data-message-id={msg._id}
+                                    data-sender-id={msg.sender._id}
+                                    className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSameUser ? 'mt-1' : 'mt-4'} group/message`}
+                                >
+                                    {!isMe && !isSameUser && (
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white mr-3 shadow-lg shrink-0">
+                                            {msg.sender.username?.substring(0, 2).toUpperCase()}
+                                        </div>
+                                    )}
+                                    {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
+
+                                    <div className={`max-w-[90%] md:max-w-[70%] relative`}>
+                                        {isEditing ? (
+                                            <div className="flex flex-col space-y-2">
+                                                <textarea
+                                                    value={editContent}
+                                                    onChange={(e) => setEditContent(e.target.value)}
+                                                    className="bg-slate-800 text-slate-200 rounded-xl p-3 text-sm border border-violet-500 outline-none w-full min-w-[200px]"
+                                                    rows="2"
+                                                />
+                                                <div className="flex justify-end space-x-2">
+                                                    <button onClick={() => setEditingMessageId(null)} className="text-xs text-slate-400 hover:text-white">Cancel</button>
+                                                    <button onClick={handleSaveEdit} className="text-xs bg-violet-600 text-white px-3 py-1 rounded-md hover:bg-violet-500">Save</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className={`px-4 py-3 rounded-2xl text-[15px] shadow-lg leading-relaxed relative group-hover/message:shadow-xl transition-all ${isMe
+                                                    ? 'bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-br-md'
+                                                    : 'bg-slate-800/90 text-slate-100 rounded-bl-md border border-slate-700/50'
+                                                    }`}>
+                                                    {msg.content}
+                                                    {/* Message Actions */}
+                                                    {isMe && (
+                                                        <div className="absolute -top-9 right-0 bg-slate-900/95 backdrop-blur-sm border border-slate-700 rounded-lg shadow-2xl p-1.5 flex space-x-1 opacity-0 group-hover/message:opacity-100 transition-all z-10">
+                                                            <button onClick={() => handleEdit(msg)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-violet-400 transition-colors">
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button onClick={() => deleteMessage(msg._id)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-red-400 transition-colors">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Sender Name and Time - WhatsApp Style */}
+                                                {showTimestamp && (
+                                                    <div className={`flex items-center mt-1.5 text-[11px] ${isMe ? 'justify-end text-slate-400' : 'justify-start text-slate-500'} px-1`}>
+                                                        {!isMe && <span className="font-semibold">{msg.sender.username}</span>}
+                                                        {!isMe && <span className="mx-1.5 text-slate-600">•</span>}
+                                                        <span className="font-normal">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        {isMe && <MessageStatusIndicator status={msg.status || 'sent'} isMe={isMe} />}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
 
                 {/* Typing Indicator */}
                 {Object.keys(typingUsers).length > 0 && (

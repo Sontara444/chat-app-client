@@ -55,7 +55,18 @@ export const ChatProvider = ({ children }) => {
 
         socket.on('receive_message', (message) => {
             if (currentChannel && message.channel === currentChannel._id) {
-                setMessages((prev) => [...prev, message]);
+                setMessages((prev) => {
+                    // Prevent duplicates by checking if message already exists
+                    if (prev.some(m => m._id === message._id)) {
+                        return prev;
+                    }
+                    return [...prev, message];
+                });
+
+                // Auto-mark as delivered when receiving a message
+                if (message.sender._id !== JSON.parse(localStorage.getItem('user')).id) {
+                    socket.emit('message_delivered', { messageId: message._id, channelId: currentChannel._id });
+                }
             }
         });
 
@@ -65,6 +76,10 @@ export const ChatProvider = ({ children }) => {
 
         socket.on('message_deleted', (messageId) => {
             setMessages((prev) => prev.filter(msg => msg._id !== messageId));
+        });
+
+        socket.on('status_updated', (updatedMessage) => {
+            setMessages((prev) => prev.map(msg => msg._id === updatedMessage._id ? updatedMessage : msg));
         });
 
         socket.on('typing', ({ userId, username, channelId }) => {
@@ -91,6 +106,7 @@ export const ChatProvider = ({ children }) => {
             socket.off('receive_message');
             socket.off('message_updated');
             socket.off('message_deleted');
+            socket.off('status_updated');
             socket.off('typing');
             socket.off('stop_typing');
             socket.off('online_users');
@@ -206,6 +222,22 @@ export const ChatProvider = ({ children }) => {
             }
         } catch (error) {
             console.error("Error loading more messages", error);
+        }
+    };
+
+    const markMessagesAsDelivered = (messageIds) => {
+        if (socket && currentChannel) {
+            messageIds.forEach(messageId => {
+                socket.emit('message_delivered', { messageId, channelId: currentChannel._id });
+            });
+        }
+    };
+
+    const markMessagesAsRead = async (messageIds) => {
+        if (socket && currentChannel) {
+            messageIds.forEach(messageId => {
+                socket.emit('message_read', { messageId, channelId: currentChannel._id });
+            });
         }
     };
 
@@ -412,6 +444,8 @@ export const ChatProvider = ({ children }) => {
         deleteChannel,
         onlineUsers,
         loading,
+        markMessagesAsDelivered,
+        markMessagesAsRead,
         // WebRTC
         call,
         callAccepted,
