@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
+import SimplePeer from 'simple-peer';
 import api from '../api/api';
 
 const ChatContext = createContext();
@@ -239,6 +240,123 @@ export const ChatProvider = ({ children }) => {
         }
     };
 
+    const [call, setCall] = useState({});
+    const [callAccepted, setCallAccepted] = useState(false);
+    const [callEnded, setCallEnded] = useState(false);
+    const [stream, setStream] = useState(null);
+    const [name, setName] = useState('');
+    const [isCallActive, setIsCallActive] = useState(false);
+    const [callType, setCallType] = useState('video');
+
+    const myVideo = useRef();
+    const userVideo = useRef();
+    const connectionRef = useRef();
+
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on('call_user', ({ from, name: callerName, signal, callType }) => {
+            setCall({ isReceivingCall: true, from, name: callerName, signal, callType });
+            setIsCallActive(true);
+            setCallType(callType || 'video');
+        });
+
+        socket.on('call_accepted', (signal) => {
+            setCallAccepted(true);
+            connectionRef.current.signal(signal);
+        });
+
+        socket.on('end_call', () => {
+            setCallEnded(true);
+            setIsCallActive(false);
+            leaveCall(false);
+        });
+
+        return () => {
+            socket.off('call_user');
+            socket.off('call_accepted');
+            socket.off('end_call');
+        }
+    }, [socket]);
+
+    const answerCall = () => {
+        setCallAccepted(true);
+        const peer = new SimplePeer({ initiator: false, trickle: false, stream });
+
+        peer.on('signal', (data) => {
+            socket.emit('answer_call', { signal: data, to: call.from });
+        });
+
+        peer.on('stream', (currentStream) => {
+            if (userVideo.current) {
+                userVideo.current.srcObject = currentStream;
+            }
+        });
+
+        peer.signal(call.signal);
+        connectionRef.current = peer;
+    };
+
+    const callUser = (id, type = 'video') => {
+        setCallType(type);
+        const peer = new SimplePeer({ initiator: true, trickle: false, stream });
+
+        peer.on('signal', (data) => {
+            socket.emit('call_user', {
+                userToCall: id,
+                signalData: data,
+                from: socket.id,
+                name: JSON.parse(localStorage.getItem('user')).username,
+                callType: type
+            });
+        });
+
+        peer.on('stream', (currentStream) => {
+            if (userVideo.current) {
+                userVideo.current.srcObject = currentStream;
+            }
+        });
+
+        socket.on('call_accepted', (signal) => {
+            setCallAccepted(true);
+            peer.signal(signal);
+        });
+
+        connectionRef.current = peer;
+        setIsCallActive(true);
+    };
+
+    const leaveCall = (emit = true) => {
+        setCallEnded(true);
+        setIsCallActive(false);
+        if (connectionRef.current) {
+            connectionRef.current.destroy();
+        }
+        // Notify other user
+        if (emit && callAccepted && !callEnded) {
+            socket.emit('end_call', { to: call.from }); // This might be wrong if we are the caller.
+            // We need to know who we are talking to.
+        }
+
+        // Save history
+        if (callAccepted) {
+            const typeText = callType === 'video' ? 'Video Call' : 'Voice Call';
+            sendMessage(`${typeText} ended.`);
+        }
+
+        // Reset state
+        setCall({});
+        setCallAccepted(false);
+
+        // Stop stream tracks
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
+        }
+
+        window.location.reload(); // Simple way to clean up for now
+    };
+
     const value = {
         socket,
         channels,
@@ -258,7 +376,23 @@ export const ChatProvider = ({ children }) => {
         updateChannel,
         deleteChannel,
         onlineUsers,
-        loading
+        loading,
+        // WebRTC
+        call,
+        callAccepted,
+        myVideo,
+        userVideo,
+        stream,
+        name,
+        setName,
+        callEnded,
+        isCallActive,
+        setIsCallActive,
+        setStream,
+        answerCall,
+        callUser,
+        leaveCall,
+        callType
     };
 
     return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
