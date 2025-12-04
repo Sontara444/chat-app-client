@@ -81,37 +81,47 @@ const VideoCall = () => {
                     {/* Main Video (Remote User) */}
                     <div className="absolute inset-0 flex items-center justify-center">
                         {callAccepted && !callEnded ? (
-                            callType === 'video' ? (
-                                <video
-                                    playsInline
-                                    ref={userVideo}
-                                    autoPlay
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                // Voice call - show large avatar
-                                <div className="flex flex-col items-center justify-center space-y-6 animate-fade-in">
-                                    <div className="w-40 h-40 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 flex items-center justify-center text-white font-bold text-6xl shadow-2xl ring-8 ring-violet-500/30 animate-pulse-slow">
-                                        {call.name ? call.name.substring(0, 2).toUpperCase() : "U"}
-                                    </div>
-                                    <div className="text-center">
-                                        <h4 className="text-white font-bold text-2xl mb-2">{call.name || "User"}</h4>
-                                        <p className="text-violet-300 flex items-center justify-center space-x-2">
-                                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                            <span>Connected</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            )
+                            <>
+                                {callType === 'video' ? (
+                                    <video
+                                        playsInline
+                                        ref={userVideo}
+                                        autoPlay
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <>
+                                        {/* Hidden audio element for voice calls */}
+                                        <audio
+                                            playsInline
+                                            ref={userVideo}
+                                            autoPlay
+                                            className="hidden"
+                                        />
+                                        {/* Voice call - show large avatar */}
+                                        <div className="flex flex-col items-center justify-center space-y-6">
+                                            <div className="w-40 h-40 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 flex items-center justify-center text-white font-bold text-6xl shadow-2xl ring-8 ring-violet-500/30 animate-pulse">
+                                                {call.name ? call.name.substring(0, 2).toUpperCase() : "U"}
+                                            </div>
+                                            <div className="text-center">
+                                                <h4 className="text-white font-bold text-2xl mb-2">{call.name || "User"}</h4>
+                                                <p className="text-violet-300 flex items-center justify-center space-x-2">
+                                                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                                                    <span>Connected</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </>
                         ) : (
                             // Calling state - show avatar with animation
-                            <div className="flex flex-col items-center justify-center space-y-6 animate-fade-in">
+                            <div className="flex flex-col items-center justify-center space-y-6">
                                 <div className="relative">
-                                    <div className="w-40 h-40 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 flex items-center justify-center text-white font-bold text-6xl shadow-2xl animate-pulse-slow">
+                                    <div className="w-40 h-40 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 flex items-center justify-center text-white font-bold text-6xl shadow-2xl animate-pulse">
                                         {call.name ? call.name.substring(0, 2).toUpperCase() : user?.username?.substring(0, 2).toUpperCase()}
                                     </div>
                                     <div className="absolute inset-0 rounded-full border-4 border-violet-400 animate-ping opacity-20"></div>
-                                    <div className="absolute inset-0 rounded-full border-4 border-violet-400 animate-ping opacity-20" style={{ animationDelay: '0.5s' }}></div>
                                 </div>
                                 <div className="text-center">
                                     <h4 className="text-white font-bold text-2xl mb-2">{call.name || "Calling..."}</h4>
@@ -151,8 +161,8 @@ const VideoCall = () => {
 
                 {/* Incoming Call Modal */}
                 {call.isReceivingCall && !callAccepted && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-lg z-50 animate-fade-in">
-                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-3xl shadow-2xl border border-violet-500/30 max-w-md w-full mx-4 animate-scale-in">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-lg z-50">
+                        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-3xl shadow-2xl border border-violet-500/30 max-w-md w-full mx-4">
                             <div className="flex flex-col items-center space-y-6">
                                 {/* Caller Avatar */}
                                 <div className="relative">
@@ -160,7 +170,6 @@ const VideoCall = () => {
                                         {call.name ? call.name.substring(0, 2).toUpperCase() : "U"}
                                     </div>
                                     <div className="absolute inset-0 rounded-full border-4 border-violet-400 animate-ping opacity-20"></div>
-                                    <div className="absolute inset-0 rounded-full border-4 border-violet-400 animate-ping opacity-20" style={{ animationDelay: '0.5s' }}></div>
                                 </div>
 
                                 {/* Caller Info */}
@@ -183,7 +192,7 @@ const VideoCall = () => {
                                     </button>
                                     <button
                                         onClick={answerCall}
-                                        className="group flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 shadow-xl hover:shadow-green-500/50 hover:scale-110 animate-pulse-slow"
+                                        className="group flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 shadow-xl hover:shadow-green-500/50 hover:scale-110 animate-pulse"
                                     >
                                         <Phone size={28} className="transform group-hover:-rotate-12 transition-transform" />
                                     </button>
@@ -198,8 +207,8 @@ const VideoCall = () => {
                     <button
                         onClick={toggleMic}
                         className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${micOn
-                            ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                            : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                             } text-white backdrop-blur-sm hover:scale-110`}
                     >
                         {micOn ? <Mic size={24} /> : <MicOff size={24} />}
@@ -212,8 +221,8 @@ const VideoCall = () => {
                         <button
                             onClick={toggleVideo}
                             className={`group relative p-5 rounded-full transition-all duration-200 shadow-xl ${videoOn
-                                ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
-                                : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
+                                    ? 'bg-slate-800/80 hover:bg-slate-700 border border-slate-700/50'
+                                    : 'bg-red-500 hover:bg-red-600 border border-red-400/50'
                                 } text-white backdrop-blur-sm hover:scale-110`}
                         >
                             {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
@@ -234,43 +243,6 @@ const VideoCall = () => {
                     </button>
                 </div>
             </div>
-
-            {/* Custom Animations */}
-            <style jsx>{`
-                @keyframes fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes scale-in {
-                    from { 
-                        opacity: 0; 
-                        transform: scale(0.9);
-                    }
-                    to { 
-                        opacity: 1; 
-                        transform: scale(1);
-                    }
-                }
-                @keyframes pulse-slow {
-                    0%, 100% { 
-                        opacity: 1; 
-                        transform: scale(1);
-                    }
-                    50% { 
-                        opacity: 0.8; 
-                        transform: scale(1.05);
-                    }
-                }
-                .animate-fade-in {
-                    animation: fade-in 0.3s ease-out;
-                }
-                .animate-scale-in {
-                    animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-                }
-                .animate-pulse-slow {
-                    animation: pulse-slow 2s ease-in-out infinite;
-                }
-            `}</style>
         </div>
     );
 };
