@@ -23,12 +23,14 @@ The client supports real-time messaging, pagination, message search, typing indi
 > These are **additional advanced features** implemented beyond basic requirements.
 
 - **Private channels UI**  
+- **Emoji Picker**
 - **Typing indicators**  
 - **Message editing**  
 - **Message deletion**  
 - **Message search**  
 - **Voice call (WebRTC)**  
 - **Video call (WebRTC)**  
+
 
 ---
 
