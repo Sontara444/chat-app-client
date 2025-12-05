@@ -64,7 +64,8 @@ export const ChatProvider = ({ children }) => {
                 });
 
                 // Auto-mark as delivered when receiving a message
-                if (message.sender._id !== JSON.parse(localStorage.getItem('user')).id) {
+                const currentUser = JSON.parse(localStorage.getItem('user'));
+                if (message.sender?._id && currentUser && message.sender._id !== currentUser.id) {
                     socket.emit('message_delivered', { messageId: message._id, channelId: currentChannel._id });
                 }
             }
