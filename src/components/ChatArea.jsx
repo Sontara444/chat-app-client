@@ -238,7 +238,7 @@ const ChatArea = ({ onOpenSidebar }) => {
         if (!currentChannel || !messages.length || !user) return;
 
         const unreadMessages = messages
-            .filter(msg => msg.sender._id !== user.id)
+            .filter(msg => msg.sender?._id && user?.id && msg.sender._id !== user.id)
             .map(msg => msg._id);
 
         if (unreadMessages.length > 0) {
@@ -288,10 +288,10 @@ const ChatArea = ({ onOpenSidebar }) => {
                             <button onClick={() => setShowCallModal(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
                         </div>
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {onlineUsers.filter(u => u._id !== user.id).length === 0 ? (
+                            {onlineUsers.filter(u => u?._id && user?.id && u._id !== user.id).length === 0 ? (
                                 <p className="text-slate-400 text-center py-4">No other users online.</p>
                             ) : (
-                                onlineUsers.filter(u => u._id !== user.id).map(onlineUser => (
+                                onlineUsers.filter(u => u?._id && user?.id && u._id !== user.id).map(onlineUser => (
                                     <button
                                         key={onlineUser._id}
                                         onClick={() => {
