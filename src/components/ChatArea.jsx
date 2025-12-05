@@ -199,6 +199,7 @@ const ChatArea = ({ onOpenSidebar }) => {
     // Helper function to check if we should show timestamp
     const shouldShowTimestamp = (currentMsg, nextMsg, index) => {
         if (!nextMsg) return true; // Always show on last message in cluster
+        if (!currentMsg?.sender || !nextMsg?.sender) return true; // Safety check
 
         const currentTime = new Date(currentMsg.timestamp);
         const nextTime = new Date(nextMsg.timestamp);
@@ -238,7 +239,7 @@ const ChatArea = ({ onOpenSidebar }) => {
         if (!currentChannel || !messages.length || !user) return;
 
         const unreadMessages = messages
-            .filter(msg => msg.sender?._id && user?.id && msg.sender._id !== user.id)
+            .filter(msg => msg?.sender?._id && msg.sender._id !== user?.id)
             .map(msg => msg._id);
 
         if (unreadMessages.length > 0) {
@@ -288,10 +289,10 @@ const ChatArea = ({ onOpenSidebar }) => {
                             <button onClick={() => setShowCallModal(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
                         </div>
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {onlineUsers.filter(u => u?._id && user?.id && u._id !== user.id).length === 0 ? (
+                            {onlineUsers.filter(u => u?._id && u._id !== user?.id).length === 0 ? (
                                 <p className="text-slate-400 text-center py-4">No other users online.</p>
                             ) : (
-                                onlineUsers.filter(u => u?._id && user?.id && u._id !== user.id).map(onlineUser => (
+                                onlineUsers.filter(u => u?._id && u._id !== user?.id).map(onlineUser => (
                                     <button
                                         key={onlineUser._id}
                                         onClick={() => {
@@ -402,15 +403,18 @@ const ChatArea = ({ onOpenSidebar }) => {
                             <h3 className="text-white font-bold">Search Results ({searchResults.length})</h3>
                             <button onClick={() => setSearchResults([])} className="text-slate-400 hover:text-white"><X size={20} /></button>
                         </div>
-                        {searchResults.map(msg => (
-                            <div key={msg._id} className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                <div className="flex items-baseline justify-between mb-1">
-                                    <span className="text-sm font-bold text-violet-400">{msg.sender?.username || 'Unknown'}</span>
-                                    <span className="text-xs text-slate-500">{new Date(msg.timestamp).toLocaleString()}</span>
+                        {searchResults.map(msg => {
+                            if (!msg || !msg.sender) return null;
+                            return (
+                                <div key={msg._id} className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <div className="flex items-baseline justify-between mb-1">
+                                        <span className="text-sm font-bold text-violet-400">{msg.sender.username}</span>
+                                        <span className="text-xs text-slate-500">{new Date(msg.timestamp).toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-slate-300">{msg.content}</p>
                                 </div>
-                                <p className="text-slate-300">{msg.content}</p>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -431,8 +435,9 @@ const ChatArea = ({ onOpenSidebar }) => {
 
                         {/* Messages for this day */}
                         {group.messages.map((msg, index) => {
-                            const isMe = msg.sender?._id === user?.id;
-                            const isSameUser = index > 0 && group.messages[index - 1]?.sender?._id === msg.sender?._id;
+                            if (!msg || !msg.sender) return null; // Skip malformed messages
+                            const isMe = msg.sender._id === user?.id;
+                            const isSameUser = index > 0 && group.messages[index - 1]?.sender?._id === msg.sender._id;
                             const isEditing = editingMessageId === msg._id;
                             const nextMsg = group.messages[index + 1];
                             const showTimestamp = shouldShowTimestamp(msg, nextMsg, index);
@@ -444,7 +449,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                                 >
                                     {!isMe && !isSameUser && (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white mr-3 shadow-lg shrink-0">
-                                            {msg.sender?.username?.substring(0, 2).toUpperCase()}
+                                            {msg.sender.username?.substring(0, 2).toUpperCase()}
                                         </div>
                                     )}
                                     {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
@@ -485,7 +490,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                                                 {/* Sender Name and Time - WhatsApp Style */}
                                                 {showTimestamp && (
                                                     <div className={`flex items-center mt-1.5 text-[11px] ${isMe ? 'justify-end text-slate-400' : 'justify-start text-slate-500'} px-1`}>
-                                                        {!isMe && <span className="font-semibold">{msg.sender?.username || 'Unknown'}</span>}
+                                                        {!isMe && <span className="font-semibold">{msg.sender.username}</span>}
                                                         {!isMe && <span className="mx-1.5 text-slate-600">•</span>}
                                                         <span className="font-normal">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         {isMe && <MessageStatusIndicator status={msg.status || 'sent'} isMe={isMe} />}

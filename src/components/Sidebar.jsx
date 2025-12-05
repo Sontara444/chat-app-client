@@ -230,25 +230,28 @@ const Sidebar = ({ isOpen, onClose }) => {
                             {isPrivate && (
                                 <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-700 
                                 rounded p-1 bg-slate-900">
-                                    {allUsers.map(user => (
-                                        <div
-                                            key={user._id}
-                                            onClick={() => toggleMember(user._id)}
-                                            className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs 
+                                    {allUsers.map(user => {
+                                        if (!user || !user._id) return null;
+                                        return (
+                                            <div
+                                                key={user._id}
+                                                onClick={() => toggleMember(user._id)}
+                                                className={`flex items-center px-2 py-1 rounded cursor-pointer text-xs 
                                             ${selectedMembers.includes(user._id)
-                                                    ? 'bg-violet-900/50 text-violet-200'
-                                                    : 'hover:bg-slate-800 text-slate-300'
-                                                }`}
-                                        >
-                                            <div className={`w-3 h-3 rounded-full mr-2 border 
+                                                        ? 'bg-violet-900/50 text-violet-200'
+                                                        : 'hover:bg-slate-800 text-slate-300'
+                                                    }`}
+                                            >
+                                                <div className={`w-3 h-3 rounded-full mr-2 border 
                                                 ${selectedMembers.includes(user._id)
-                                                    ? 'bg-violet-500 border-violet-500'
-                                                    : 'border-slate-500'
-                                                }`}
-                                            ></div>
-                                            {user.username}
-                                        </div>
-                                    ))}
+                                                        ? 'bg-violet-500 border-violet-500'
+                                                        : 'border-slate-500'
+                                                    }`}
+                                                ></div>
+                                                {user.username}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 
@@ -270,9 +273,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <div className="space-y-1 px-2">
 
                     {channels.map(channel => {
+                        if (!channel || !channel._id) return null;
 
-                        const isMember = channel.members.some(
-                            m => m._id === currentUser?.id || m === currentUser?.id
+                        const isMember = channel.members?.some(
+                            m => m?._id === currentUser?.id || m === currentUser?.id
                         );
 
                         const isPrivateChannel = channel.type === 'private';
