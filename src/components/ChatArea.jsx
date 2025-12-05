@@ -431,23 +431,11 @@ const ChatArea = ({ onOpenSidebar }) => {
 
                         {/* Messages for this day */}
                         {group.messages.map((msg, index) => {
-                            const isMe = msg.sender?._id === user?.id; // Optional chaining for system messages
-                            const isSameUser = index > 0 && group.messages[index - 1].sender?._id === msg.sender?._id;
+                            const isMe = msg.sender._id === user?.id;
+                            const isSameUser = index > 0 && group.messages[index - 1].sender._id === msg.sender._id;
                             const isEditing = editingMessageId === msg._id;
                             const nextMsg = group.messages[index + 1];
                             const showTimestamp = shouldShowTimestamp(msg, nextMsg, index);
-
-                            if (msg.type === 'system') {
-                                return (
-                                    <div key={msg._id} className="flex items-center justify-center my-2">
-                                        <div className="bg-slate-800/40 px-3 py-1 rounded-full text-xs text-slate-500 italic flex items-center">
-                                            <span>{msg.content}</span>
-                                            <span className="mx-1.5 text-slate-600">•</span>
-                                            <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                    </div>
-                                );
-                            }
 
                             return (
                                 <div
@@ -456,7 +444,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                                 >
                                     {!isMe && !isSameUser && (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white mr-3 shadow-lg shrink-0">
-                                            {msg.sender?.username?.substring(0, 2).toUpperCase()}
+                                            {msg.sender.username?.substring(0, 2).toUpperCase()}
                                         </div>
                                     )}
                                     {!isMe && isSameUser && <div className="w-11" />} {/* Spacer for alignment */}
@@ -497,7 +485,7 @@ const ChatArea = ({ onOpenSidebar }) => {
                                                 {/* Sender Name and Time - WhatsApp Style */}
                                                 {showTimestamp && (
                                                     <div className={`flex items-center mt-1.5 text-[11px] ${isMe ? 'justify-end text-slate-400' : 'justify-start text-slate-500'} px-1`}>
-                                                        {!isMe && <span className="font-semibold">{msg.sender?.username}</span>}
+                                                        {!isMe && <span className="font-semibold">{msg.sender.username}</span>}
                                                         {!isMe && <span className="mx-1.5 text-slate-600">•</span>}
                                                         <span className="font-normal">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                         {isMe && <MessageStatusIndicator status={msg.status || 'sent'} isMe={isMe} />}
